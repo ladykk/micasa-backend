@@ -4,6 +4,7 @@ const DB = require("../db");
 const jwt = require("jsonwebtoken");
 const Property = require("../models/property");
 
+//Add Property
 router.post("/add", async (req, res) => {
   try {
     let isError = false;
@@ -137,6 +138,683 @@ router.post("/add", async (req, res) => {
             res.status(201).send({ message: "success" });
           }
         }
+      }
+    }
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      res.status(401).send({ message: "error", error: "Unauthorized" });
+      return;
+    }
+    console.error(err);
+    res.status(500).send({
+      message: "error",
+      error: err.stack,
+    });
+  }
+});
+
+//Edit Property
+router.get("/edit/:property_id", async (req, res) => {
+  try {
+    if (!req.params.property_id) {
+      res.status(400).send({ message: "error", error: "Bad request." });
+      return;
+    }
+    //Get Token
+    const cookie = req.cookies["jwt"];
+    //Verify Token
+    const claim = jwt.verify(cookie, process.env.SECRET);
+    //Check is invalid
+    if (!claim) {
+      res.status(401).send({
+        message: "error",
+        error: "Unauthorized",
+      });
+      return;
+    } else {
+      const user_result = await DB.query(
+        "SELECT * FROM users WHERE username=$1;",
+        [claim.username]
+      ).catch((err) => {
+        res.status(500).send({
+          message: "error",
+          error: { code: err.code, detailL: err.detail },
+          full_error: err,
+        });
+        return;
+      });
+
+      //Check if user is found.
+      if (!user_result.rows[0]) {
+        return res
+          .status(401)
+          .status({ message: "error", error: "Unauthorized" });
+      }
+      const seller = user_result.rows[0].username;
+      const property_result = await DB.query(
+        "SELECT * FROM properties WHERE property_id=$1 AND seller=$2;",
+        [req.params.property_id, seller]
+      ).catch((err) => {
+        res.status(500).send({
+          message: "error",
+          error: { code: err.code, detailL: err.detail },
+          full_error: err,
+        });
+      });
+      if (property_result.rows[0]) {
+        const property = Property.property(property_result.rows[0]);
+        res.status(200).send({ message: "success", payload: property });
+      } else {
+        return res
+          .status(401)
+          .send({ message: "error", error: "Unauthorized" });
+      }
+    }
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      res.status(401).send({ message: "error", error: "Unauthorized" });
+      return;
+    }
+    console.error(err);
+    res.status(500).send({
+      message: "error",
+      error: err.stack,
+    });
+  }
+});
+router.patch("/edit/:property_id", async (req, res) => {
+  try {
+    let isError = false;
+    if (!req.params.property_id) {
+      res.status(400).send({ message: "error", error: "Bad request." });
+      return;
+    }
+    //Get Token
+    const cookie = req.cookies["jwt"];
+    //Verify Token
+    const claim = jwt.verify(cookie, process.env.SECRET);
+    //Check is invalid
+    if (!claim) {
+      res.status(401).send({
+        message: "error",
+        error: "Unauthorized",
+      });
+      return;
+    } else {
+      const user_result = await DB.query(
+        "SELECT * FROM users WHERE username=$1;",
+        [claim.username]
+      ).catch((err) => {
+        res.status(500).send({
+          message: "error",
+          error: { code: err.code, detailL: err.detail },
+          full_error: err,
+        });
+        return;
+      });
+
+      //Check if user is found.
+      if (!user_result.rows[0]) {
+        res.cookie("jwt", "", { maxAge: 0 });
+        return res
+          .status(401)
+          .status({ message: "error", error: "Unauthorized" });
+      }
+      const seller = user_result.rows[0].username;
+      const property_result = await DB.query(
+        "SELECT * FROM properties WHERE property_id=$1 AND seller=$2;",
+        [req.params.property_id, seller]
+      ).catch((err) => {
+        res.status(500).send({
+          message: "error",
+          error: { code: err.code, detailL: err.detail },
+          full_error: err,
+        });
+      });
+      if (property_result.rows[0]) {
+        const property = Property.property(property_result.rows[0]);
+        const status = property.status;
+        switch (status) {
+          case "Sold":
+            res.status(401).send({
+              message: "error",
+              property: "Property already sold out.",
+            });
+          default:
+        }
+        const update_data = Property.update_data(req.body, req.files);
+        if (update_data.isChange) {
+          if (update_data.info && !isError) {
+            for (let attribute in update_data.info) {
+              if (isError) {
+                break;
+              }
+              await DB.query(
+                `UPDATE properties SET ${attribute}=$1 WHERE property_id=$2;`,
+                [update_data.info[attribute], property.property_id]
+              ).catch((err) => {
+                res.status(500).send({
+                  message: "error",
+                  error: { code: err.code, detailL: err.detail },
+                  full_error: err,
+                });
+                isError = true;
+              });
+            }
+          }
+          if (update_data.images && !isError) {
+            for (let attribute in update_data.images) {
+              if (isError) {
+                break;
+              }
+              if (update_data.images[attribute] === "Remove") {
+                await DB.query("DELETE FROM images WHERE image_id=$1;", [
+                  property.images[attribute],
+                ]).catch((err) => {
+                  res.status(500).send({
+                    message: "error",
+                    error: { code: err.code, detailL: err.detail },
+                    full_error: err,
+                  });
+                  isError = true;
+                });
+                continue;
+              }
+              const { name, data } = update_data.images[attribute];
+              if (property.images[attribute] !== null) {
+                await DB.query(
+                  `UPDATE images SET file_name=$1, data=$2 WHERE image_id=$3;`,
+                  [name, data, property.images[attribute]]
+                ).catch((err) => {
+                  res.status(500).send({
+                    message: "error",
+                    error: { code: err.code, detailL: err.detail },
+                    full_error: err,
+                  });
+                  isError = true;
+                });
+              } else {
+                const insert_image_result = await DB.query(
+                  "INSERT INTO images (file_name, data) VALUES($1,$2) RETURNING image_id;",
+                  [name, data]
+                ).catch((err) => {
+                  res.status(500).send({
+                    message: "error",
+                    error: { code: err.code, detailL: err.detail },
+                    full_error: err,
+                  });
+                  isError = true;
+                });
+                if (insert_image_result.rows[0].image_id && !isError) {
+                  const image_id = insert_image_result.rows[0].image_id;
+                  await DB.query(
+                    `UPDATE properties SET ${attribute}=$1 WHERE property_id=$2;`,
+                    [image_id, property.property_id]
+                  ).catch((err) => {
+                    res.status(500).send({
+                      message: "error",
+                      error: { code: err.code, detailL: err.detail },
+                      full_error: err,
+                    });
+                    isError = true;
+                  });
+                }
+              }
+            }
+          }
+          if (!isError) {
+            res
+              .status(201)
+              .send({ message: "success", change: "changes saved." });
+          }
+        } else {
+          res.status(200).send({ message: "success", change: "no change" });
+        }
+      } else {
+        return res
+          .status(401)
+          .send({ message: "error", error: "Unauthorized" });
+      }
+    }
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      res.status(401).send({ message: "error", error: "Unauthorized" });
+      return;
+    }
+    console.error(err);
+    res.status(500).send({
+      message: "error",
+      error: err.stack,
+    });
+  }
+});
+
+//Get Property
+router.get("/id/:property_id", async (req, res) => {
+  let property;
+  let username;
+  try {
+    if (!req.params.property_id) {
+      res.status(400).send({ message: "error", error: "Bad request." });
+      return;
+    }
+    //Get Token
+    const cookie = req.cookies["jwt"];
+    //Verify Token
+    const claim = jwt.verify(cookie, process.env.SECRET);
+    if (claim) {
+      const user_result = await DB.query(
+        "SELECT * FROM users WHERE username=$1;",
+        [claim.username]
+      ).catch((err) => {
+        res.status(500).send({
+          message: "error",
+          error: { code: err.code, detailL: err.detail },
+          full_error: err,
+        });
+        return;
+      });
+
+      //Check if user is found.
+      if (user_result.rows[0]) {
+        username = user_result.rows[0].username;
+        const customer_result = await DB.query(
+          "SELECT username FROM agents WHERE username=$1 UNION SELECT username FROM webmasters WHERE username=$1;",
+          [username]
+        );
+        const isCustomer = customer_result.rows[0] ? false : true;
+        if (username && isCustomer) {
+          const property_exist_result = await DB.query(
+            "SELECT property_id FROM properties WHERE property_id=$1",
+            [req.params.property_id]
+          ).catch((err) => {
+            res.status(500).send({
+              message: "error",
+              error: { code: err.code, detailL: err.detail },
+              full_error: err,
+            });
+          });
+          if (property_exist_result.rows[0]) {
+            const history_result = await DB.query(
+              "SELECT * FROM history WHERE username=$1 AND property_id=$2;",
+              [username, req.params.property_id]
+            ).catch((err) => {
+              res.status(500).send({
+                message: "error",
+                error: { code: err.code, detailL: err.detail },
+                full_error: err,
+              });
+            });
+            if (history_result.rows[0]) {
+              await DB.query(
+                "UPDATE history SET timestamp=CURRENT_TIMESTAMP WHERE username=$1 AND property_id=$2;",
+                [username, req.params.property_id]
+              ).catch((err) => {
+                res.status(500).send({
+                  message: "error",
+                  error: { code: err.code, detailL: err.detail },
+                  full_error: err,
+                });
+              });
+            } else {
+              await DB.query(
+                "INSERT INTO history (property_id, username) VALUES ($1, $2);",
+                [req.params.property_id, username]
+              ).catch((err) => {
+                res.status(500).send({
+                  message: "error",
+                  error: { code: err.code, detailL: err.detail },
+                  full_error: err,
+                });
+              });
+              console.log("inserted");
+              await DB.query(
+                "UPDATE properties SET seen=(SELECT seen + 1 FROM properties WHERE property_id=$1) WHERE property_id=$1;",
+                [req.params.property_id]
+              ).catch((err) => {
+                res.status(500).send({
+                  message: "error",
+                  error: { code: err.code, detailL: err.detail },
+                  full_error: err,
+                });
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return;
+    }
+    console.error(err);
+    res.status(500).send({
+      message: "error",
+      error: err.stack,
+    });
+  } finally {
+    const property_result = await DB.query(
+      "SELECT * FROM properties WHERE property_id=$1;",
+      [req.params.property_id]
+    ).catch((err) => {
+      res.status(500).send({
+        message: "error",
+        error: { code: err.code, detailL: err.detail },
+        full_error: err,
+      });
+    });
+    if (property_result.rows[0]) {
+      const webmaster_result = await DB.query(
+        "SELECT * FROM webmasters WHERE username=$1;",
+        [username]
+      ).catch((err) => {
+        res.status(500).send({
+          message: "error",
+          error: { code: err.code, detailL: err.detail },
+          full_error: err,
+        });
+      });
+      const isWebmaster = webmaster_result.rows[0] ? true : false;
+      property = Property.property(property_result.rows[0]);
+      if (isWebmaster) {
+        res.status(200).send({ message: "success", payload: property });
+      } else if (
+        property.status === "Pending" ||
+        property.status === "Rejected"
+      ) {
+        res.status(401).send({ message: "error", error: "Unauthorized." });
+      } else {
+        res.status(200).send({ message: "success", payload: property });
+      }
+    } else {
+      return res
+        .status(404)
+        .send({ message: "error", error: "Property not found." });
+    }
+  }
+});
+
+//Get Properties
+router.get("/query", async (req, res) => {
+  let property;
+  try {
+    let params = {
+      furnishing: [],
+      ownership: [],
+    };
+    for (let attribute in req.query) {
+      switch (attribute) {
+        case "terms":
+          params[attribute] = `'%${req.query[attribute].toLowerCase()}%'`;
+          break;
+        case "contract":
+          switch (req.query[attribute]) {
+            case "buy":
+              params[attribute] = "'Sell'";
+              break;
+            case "rent":
+              params[attribute] = "'Rent'";
+              break;
+            case "new":
+              params[attribute] = "'New house'";
+              break;
+          }
+          break;
+        case "property_type":
+        case "bedroom":
+        case "bathroom":
+          params[attribute] = `'${req.query[attribute]}'`;
+          break;
+        case "min_area":
+        case "min_price":
+        case "max_area":
+        case "max_price":
+          let number = Number.parseFloat(req.query[attribute], 10);
+          if (number > 0) {
+            params[attribute] = number;
+          }
+          break;
+        case "furnished":
+          params["furnishing"].push("'Furnished'");
+          break;
+        case "unfurnished":
+          params["furnishing"].push("'Unfurnished'");
+          break;
+        case "partly_furnished":
+          params["furnishing"].push("'Partly furnished'");
+          break;
+        case "freehold":
+          params["ownership"].push("'Freehold'");
+          break;
+        case "leasehold":
+          params["ownership"].push("'Leasehold'");
+          break;
+        case "air_conditioning":
+        case "cctv":
+        case "fitness":
+        case "library":
+        case "parking":
+        case "pet_friendly":
+        case "security":
+        case "swimming_pool":
+        case "tv":
+        case "balcony":
+        case "concierge":
+        case "garden":
+        case "lift":
+        case "playground":
+        case "river_view":
+        case "single_storey":
+        case "sport_center":
+        case "wifi":
+          if (req.query[attribute] === "false") {
+            params[attribute] = req.query[attribute];
+          }
+          break;
+        default:
+      }
+    }
+    let where_cause = "";
+    for (let param in params) {
+      switch (param) {
+        case "terms":
+          where_cause += `AND (LOWER(property_name) like ${params[param]} OR LOWER(district::text) like ${params[param]} OR LOWER(province::text) like ${params[param]} OR LOWER(near_station::text) like ${params[param]}) `;
+          break;
+        case "min_area":
+          where_cause += `AND area >= ${params[param]} `;
+          break;
+        case "min_price":
+          where_cause += `AND price >= ${params[param]} `;
+          break;
+        case "max_area":
+          where_cause += `AND area <= ${params[param]} `;
+          break;
+        case "max_price":
+          where_cause += `AND price <= ${params[param]} `;
+          break;
+        case "furnishing":
+          if (params[param].length > 0) {
+            let furnishing = params[param].join(",");
+            where_cause += `AND furnishing not in (${furnishing}) `;
+          }
+          break;
+        case "ownership":
+          if (params[param].length > 0) {
+            let ownership = params[param].join(",");
+            where_cause += `AND ownership not in (${ownership}) `;
+          }
+          break;
+        default:
+          where_cause += `AND ${param}=${params[param]} `;
+      }
+    }
+    where_cause = `WHERE status='Listing' ${where_cause}`;
+    const properties_result = await DB.query(
+      `SELECT * FROM properties ${where_cause};`
+    ).catch((err) => {
+      res.status(500).send({
+        message: "error",
+        error: { code: err.code, detailL: err.detail },
+        full_error: err,
+      });
+      return;
+    });
+    if (properties_result.rows) {
+      let format_properties = properties_result.rows.map((property) =>
+        Property.property(property)
+      );
+      res.status(200).send({ message: "success", payload: format_properties });
+    } else {
+      res.status(200).send({ message: "success", payload: [] });
+    }
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return;
+    }
+    console.error(err);
+    res.status(500).send({
+      message: "error",
+      error: err.stack,
+    });
+  }
+});
+
+//Get Own Property
+router.get("/seller/", async (req, res) => {
+  try {
+    //Get Token
+    const cookie = req.cookies["jwt"];
+    //Verify Token
+    const claim = jwt.verify(cookie, process.env.SECRET);
+    //Check is invalid
+    if (!claim) {
+      res.status(401).send({
+        message: "error",
+        error: "Unauthorized",
+      });
+      return;
+    } else {
+      const user_result = await DB.query(
+        "SELECT * FROM users WHERE username=$1;",
+        [claim.username]
+      ).catch((err) => {
+        res.status(500).send({
+          message: "error",
+          error: { code: err.code, detailL: err.detail },
+          full_error: err,
+        });
+        return;
+      });
+
+      //Check if user is found.
+      if (!user_result.rows[0]) {
+        return res
+          .status(401)
+          .status({ message: "error", error: "Unauthorized" });
+      }
+      const seller = user_result.rows[0].username;
+      const property_result = await DB.query(
+        "SELECT * FROM properties WHERE seller=$1 ORDER BY property_id;",
+        [seller]
+      ).catch((err) => {
+        res.status(500).send({
+          message: "error",
+          error: { code: err.code, detailL: err.detail },
+          full_error: err,
+        });
+      });
+      if (property_result.rows) {
+        const property = property_result.rows.map((property) => {
+          return Property.property(property);
+        });
+        res.status(200).send({ message: "success", payload: property });
+      } else {
+        return res
+          .status(401)
+          .send({ message: "error", error: "Unauthorized" });
+      }
+    }
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      res.status(401).send({ message: "error", error: "Unauthorized" });
+      return;
+    }
+    console.error(err);
+    res.status(500).send({
+      message: "error",
+      error: err.stack,
+    });
+  }
+});
+
+//Get Property Seller
+router.get("/contact/:property_id", async (req, res) => {
+  try {
+    if (!req.params.property_id) {
+      res.status(400).send({ message: "error", error: "Bad request." });
+      return;
+    }
+    //Get Token
+    const cookie = req.cookies["jwt"];
+    //Verify Token
+    const claim = jwt.verify(cookie, process.env.SECRET);
+    //Check is invalid
+    if (!claim) {
+      res.status(401).send({
+        message: "error",
+        error: "Unauthorized",
+      });
+      return;
+    } else {
+      const user_result = await DB.query(
+        "SELECT * FROM users WHERE username=$1;",
+        [claim.username]
+      ).catch((err) => {
+        res.status(500).send({
+          message: "error",
+          error: { code: err.code, detailL: err.detail },
+          full_error: err,
+        });
+        return;
+      });
+
+      //Check if user is found.
+      if (!user_result.rows[0]) {
+        return res
+          .status(401)
+          .status({ message: "error", error: "Unauthorized" });
+      }
+      const admin_result = await DB.query(
+        "SELECT username FROM agents WHERE username=$1 UNION SELECT username FROM webmasters WHERE username=$2;",
+        [user_result.rows[0].username, user_result.rows[0].username]
+      ).catch((err) => {
+        res.status(500).send({
+          message: "error",
+          error: { code: err.code, detailL: err.detail },
+          full_error: err,
+        });
+        return;
+      });
+      if (admin_result.rows[0]) {
+        const seller_result = await DB.query(
+          "SELECT username, full_name, email, phone_number, avatar_id FROM users INNER JOIN properties ON users.username = properties.seller WHERE property_id=$1;",
+          [req.params.property_id]
+        ).catch((err) => {
+          res.status(500).send({
+            message: "error",
+            error: { code: err.code, detailL: err.detail },
+            full_error: err,
+          });
+          return;
+        });
+        res
+          .status(200)
+          .send({ message: "success", payload: seller_result.rows[0] });
+      } else {
+        res.status(401).send({
+          message: "error",
+          error: "Unauthorized",
+        });
       }
     }
   } catch (err) {

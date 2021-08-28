@@ -8,6 +8,9 @@ const file_upload = require("express-fileupload");
 const userRoute = require("./routes/user");
 const imagesRoute = require("./routes/images");
 const propertyRoute = require("./routes/property");
+const webmasterRoute = require("./routes/webmaster");
+const customerRoute = require("./routes/customer");
+const agentRoute = require("./routes/agent");
 
 //Middleware
 app.use(express.json());
@@ -24,6 +27,9 @@ app.use(file_upload());
 app.use("/api/user", userRoute);
 app.use("/images/", imagesRoute);
 app.use("/api/property", propertyRoute);
+app.use("/api/webmaster", webmasterRoute);
+app.use("/api/customer", customerRoute);
+app.use("/api/agent", agentRoute);
 
 app.listen(5000, () =>
   console.log(`Mi Casa Backend: Server started. (${new Date().toUTCString()})`)

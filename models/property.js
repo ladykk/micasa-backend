@@ -58,6 +58,116 @@ const new_property = (body, files) => {
   }
 };
 
+const property = (query) => {
+  try {
+    const property = {
+      property_id: query.property_id,
+      status: query.status,
+      property_name: query.property_name,
+      property_type: query.property_type,
+      seller: query.seller,
+      buyer: query.buyer,
+      contract: query.contract,
+      area: Number.parseFloat(query.area, 10),
+      price: Number.parseFloat(query.price, 10),
+      rent_payment: query.rent_payment,
+      rent_requirement: query.rent_requirement,
+      bedroom: query.bedroom,
+      bathroom: query.bathroom,
+      seen: Number.parseInt(query.seen),
+      district: query.district,
+      province: query.province,
+      near_station: query.near_station,
+      maps_query: query.maps_query,
+      furnishing: query.furnishing,
+      ownership: query.ownership,
+      facilities: {
+        air_conditioning: query.air_conditioning,
+        balcony: query.balcony,
+        cctv: query.cctv,
+        concierge: query.concierge,
+        fitness: query.fitness,
+        garden: query.garden,
+        library: query.library,
+        lift: query.lift,
+        parking: query.parking,
+        playground: query.playground,
+        pet_friendly: query.pet_friendly,
+        river_view: query.river_view,
+        security: query.security,
+        single_storey: query.single_storey,
+        swimming_pool: query.swimming_pool,
+        sport_center: query.sport_center,
+        tv: query.tv,
+        wifi: query.wifi,
+      },
+      description: query.description,
+      images: {
+        image_cover: query.image_cover,
+        image_1: query.image_1,
+        image_2: query.image_2,
+        image_3: query.image_3,
+        image_4: query.image_4,
+        image_5: query.image_5,
+        image_6: query.image_6,
+        image_7: query.image_7,
+        image_8: query.image_8,
+        image_9: query.image_9,
+        image_10: query.image_10,
+      },
+    };
+    return property;
+  } catch (err) {
+    console.error(err.stack);
+    return null;
+  }
+};
+
+const update_data = (body, files) => {
+  try {
+    let update_data = {
+      info: {},
+      images: {},
+      isChange: false,
+    };
+    if (body) {
+      for (let attribute in body) {
+        switch (attribute) {
+          case "image_cover":
+          case "image_1":
+          case "image_2":
+          case "image_3":
+          case "image_4":
+          case "image_5":
+          case "image_6":
+          case "image_7":
+          case "image_8":
+          case "image_9":
+          case "image_10":
+            update_data.images[attribute] = body[attribute];
+            update_data.isChange = true;
+            break;
+          default:
+            update_data.info[attribute] = body[attribute];
+            update_data.isChange = true;
+        }
+      }
+    }
+    if (files) {
+      for (let attribute in files) {
+        update_data.images[attribute] = files[attribute];
+        update_data.isChange = true;
+      }
+    }
+    return update_data;
+  } catch (err) {
+    console.error(err.stack);
+    return null;
+  }
+};
+
 module.exports = {
   new_property,
+  property,
+  update_data,
 };
