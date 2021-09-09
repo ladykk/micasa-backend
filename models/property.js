@@ -3,40 +3,38 @@ const new_property = (body, files) => {
     const new_property = {
       property_name: body.property_name,
       property_type: body.property_type,
-      contract: body.contract,
-      area: Number.parseFloat(body.area, 10),
       price: Number.parseFloat(body.price, 10),
+      contract_type: body.contract_type,
+      ownership: body.ownership,
       rent_payment: body.rent_payment,
       rent_requirement: body.rent_requirement,
+      area: Number.parseFloat(body.area, 10),
       bedroom: body.bedroom,
       bathroom: body.bathroom,
+      furnishing: body.furnishing,
+      description: body.description,
       district: body.district,
       province: body.province,
       near_station: body.near_station,
       maps_query: body.maps_query,
-      furnishing: body.furnishing,
-      ownership: body.ownership,
-      facilities: {
-        air_conditioning: body.air_conditioning === "true" ? true : false,
-        balcony: body.balcony === "true" ? true : false,
-        cctv: body.cctv === "true" ? true : false,
-        concierge: body.concierge === "true" ? true : false,
-        fitness: body.fitness === "true" ? true : false,
-        garden: body.garden === "true" ? true : false,
-        library: body.library === "true" ? true : false,
-        lift: body.lift === "true" ? true : false,
-        parking: body.parking === "true" ? true : false,
-        playground: body.playground === "true" ? true : false,
-        pet_friendly: body.pet_friendly === "true" ? true : false,
-        river_view: body.river_view === "true" ? true : false,
-        security: body.security === "true" ? true : false,
-        single_storey: body.single_storey === "true" ? true : false,
-        swimming_pool: body.swimming_pool === "true" ? true : false,
-        sport_center: body.sport_center === "true" ? true : false,
-        tv: body.tv === "true" ? true : false,
-        wifi: body.wifi === "true" ? true : false,
-      },
-      description: body.description,
+      air_conditioning: body.air_conditioning === "true" ? true : false,
+      balcony: body.balcony === "true" ? true : false,
+      cctv: body.cctv === "true" ? true : false,
+      concierge: body.concierge === "true" ? true : false,
+      fitness: body.fitness === "true" ? true : false,
+      garden: body.garden === "true" ? true : false,
+      library: body.library === "true" ? true : false,
+      lift: body.lift === "true" ? true : false,
+      parking: body.parking === "true" ? true : false,
+      playground: body.playground === "true" ? true : false,
+      pet_friendly: body.pet_friendly === "true" ? true : false,
+      river_view: body.river_view === "true" ? true : false,
+      security: body.security === "true" ? true : false,
+      single_storey: body.single_storey === "true" ? true : false,
+      swimming_pool: body.swimming_pool === "true" ? true : false,
+      sport_center: body.sport_center === "true" ? true : false,
+      tv: body.tv === "true" ? true : false,
+      wifi: body.wifi === "true" ? true : false,
       images: {
         image_cover: files.image_cover,
         image_1: files.image_1,
@@ -65,22 +63,21 @@ const property = (query) => {
       status: query.status,
       property_name: query.property_name,
       property_type: query.property_type,
-      seller: query.seller,
-      buyer: query.buyer,
-      contract: query.contract,
-      area: Number.parseFloat(query.area, 10),
       price: Number.parseFloat(query.price, 10),
+      contract_type: query.contract_type,
+      ownership: query.ownership,
       rent_payment: query.rent_payment,
       rent_requirement: query.rent_requirement,
+      area: Number.parseFloat(query.area, 10),
       bedroom: query.bedroom,
       bathroom: query.bathroom,
+      furnishing: query.furnishing,
+      description: query.description,
       seen: Number.parseInt(query.seen),
       district: query.district,
       province: query.province,
       near_station: query.near_station,
       maps_query: query.maps_query,
-      furnishing: query.furnishing,
-      ownership: query.ownership,
       facilities: {
         air_conditioning: query.air_conditioning,
         balcony: query.balcony,
@@ -101,7 +98,6 @@ const property = (query) => {
         tv: query.tv,
         wifi: query.wifi,
       },
-      description: query.description,
       images: {
         image_cover: query.image_cover,
         image_1: query.image_1,
@@ -128,6 +124,7 @@ const update_data = (body, files) => {
     let update_data = {
       info: {},
       images: {},
+      buyer: null,
       isChange: false,
     };
     if (body) {
@@ -145,6 +142,10 @@ const update_data = (body, files) => {
           case "image_9":
           case "image_10":
             update_data.images[attribute] = body[attribute];
+            update_data.isChange = true;
+            break;
+          case "buyer":
+            update_data.buyer = body[attribute];
             update_data.isChange = true;
             break;
           default:

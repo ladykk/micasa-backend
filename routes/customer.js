@@ -1,179 +1,131 @@
 const router = require("express").Router();
 const DB = require("../db");
-const jwt = require("jsonwebtoken");
 const Property = require("../models/property");
+const UserTools = require("../tools/UserTools");
+const CustomError = require("../tools/CustomError");
 
 // Customers' functions.
-// [GET] : Get customer's favorite properties.
+
+// [GET] : /favorite_properties/
 router.get("/favorite_properties/", async (req, res) => {
+  /*
+      DO: Get a list of favorite properties of customer.
+      ERROR:  1. Unauthorized.
+              2. DBError.
+  */
   try {
-    //Get Token.
-    const cookie = req.cookies["jwt"];
-    //Verify Token.
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    if (claim) {
-      //CASE: Token valid.
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1;",
-        [claim.username]
-      ).catch((err) => {
-        return res.status(500).send({
-          message: "error",
-          error: {
-            type: "database",
-            from: "user_result",
-            code: err.code,
-            detail: err.detail,
-            info: err,
-          },
-        });
-      });
-      if (user_result.rows[0]) {
-        //CASE: User found.
-        const username = user_result.rows[0].username;
-        await DB.query(
-          "SELECT * FROM history INNER JOIN properties USING(property_id) WHERE username=$1 AND is_favorite=true ORDER BY timestamp DESC;",
-          [username]
-        )
-          .then((properties_result) => {
-            return res.status(200).send({
-              message: "success",
-              payload: properties_result.rows.map((property) =>
-                Property.property(property)
-              ),
-            });
-          })
-          .catch((err) => {
-            return res.status(500).send({
-              message: "error",
-              error: {
-                type: "database",
-                from: "properties_result",
-                code: err.code,
-                detail: err.detail,
-                info: err,
-              },
-            });
+    //Check Authorization.
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      //CASE: User not found.
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    //Check is user a customer.
+    const customer = await UserTools.checkIsCustomer(user.username);
+    if (customer) {
+      //CASE: User found.
+      //Query properties that favorite.
+      await DB.query(
+        "SELECT * FROM history INNER JOIN properties USING(property_id) WHERE customer_id=$1 AND is_favorite=true ORDER BY timestamp DESC;",
+        [customer.customer_id]
+      )
+        .then((properties_result) => {
+          return res.status(200).send({
+            message: "success",
+            payload: properties_result.rows.map((property) =>
+              Property.property(property)
+            ),
           });
-      } else {
-        //CASE: User not found.
-        return res.status(401).send({
-          message: "error",
-          error: "Unauthorized.",
+        })
+        .catch((err) => {
+          throw new CustomError.DBError(err, "properties_result");
         });
-      }
     } else {
-      //CASE: Token invalid.
-      return res.status(401).send({
-        message: "error",
-        error: "Unauthorized.",
-      });
+      //CASE: Not customer.
+      throw new CustomError.Unauthorized();
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      //CASE: No token.
-      res.status(401).send({ message: "error", error: "Unauthorized" });
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
     }
-    //CASE: Server error
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: {
-        type: "server",
-        stack: err.stack,
-      },
-    });
   }
 });
-// [GET] : Get customer's favorite property.
+// [GET] : /favorite_property/:property_id
 router.get("/favorite_property/:property_id", async (req, res) => {
+  /*
+      DO: Get is customer favorite this property.
+      ERROR:  1. Unauthorized.
+              2. Bad Request.
+              3. DBError.
+  */
   try {
     //Check required information.
     if (!req.params.property_id) {
-      return res.status(400).send({ message: "error", error: "Bad request." });
+      throw new CustomError.BadRequest();
     }
     const property_id = req.params.property_id;
-    //Get Token.
-    const cookie = req.cookies["jwt"];
-    //Verify Token.
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    if (claim) {
-      //CASE: Token valid.
-      //Check is user exists?
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1;",
-        [claim.username]
+    //Check Authorized.
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      //CASE: User not found.
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    const customer = await UserTools.checkIsCustomer(user.username);
+    if (customer) {
+      //CASE: User found.
+      //Query is property favorite.
+      const favorite_result = await DB.query(
+        "SELECT is_favorite FROM history WHERE customer_id=$1 AND property_id=$2;",
+        [customer.customer_id, property_id]
       ).catch((err) => {
-        return res.status(500).send({
-          message: "error",
-          error: {
-            type: "database",
-            from: "user_result",
-            code: err.code,
-            detail: err.detail,
-            info: err,
-          },
-        });
+        throw new CustomError.DBError(err, "favorite_result");
       });
-      if (user_result.rows[0]) {
-        //CASE: User found.
-        const username = user_result.rows[0].username;
-        const favorite_result = await DB.query(
-          "SELECT is_favorite FROM history WHERE username=$1 AND property_id=$2;",
-          [username, property_id]
-        ).catch((err) => {
-          return res.status(500).send({
-            message: "error",
-            error: {
-              type: "database",
-              from: "favorite_result",
-              code: err.code,
-              detail: err.detail,
-              info: err,
-            },
-          });
-        });
-        if (favorite_result.rows[0]) {
-          //CASE: Found in history
-          const is_favorite = favorite_result.rows[0].is_favorite;
-          return res
-            .status(200)
-            .send({ message: "success", payload: is_favorite });
-        } else {
-          //CASE: Not found in history
-          return res.status(200).send({ message: "success", payload: false });
-        }
+      if (favorite_result.rows[0]) {
+        //CASE: Found in history
+        const is_favorite = favorite_result.rows[0].is_favorite;
+        return res
+          .status(200)
+          .send({ message: "success", payload: is_favorite });
       } else {
-        //CASE: User not found.
-        return res.status(401).send({
-          message: "error",
-          error: "Unauthorized.",
-        });
+        //CASE: Not found in history
+        return res.status(200).send({ message: "success", payload: false });
       }
+    } else {
+      //CASE: Not a customer.
+      return res.status(200).send({ message: "success", payload: false });
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      //CASE: No token.
-      return res.status(200).send({
-        message: "success",
-        payload: false,
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
       });
-    } else if (err instanceof TypeError) {
-      //CASE: No token.
-      return res.status(200).send({
-        message: "success",
-        payload: false,
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
       });
     }
-    //CASE: Server error.
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: {
-        type: "server",
-        stack: err.stack,
-      },
-    });
   }
 });
 // [POST] : Set customer's favorite on property.
@@ -182,160 +134,152 @@ router.post("/favorite_property/:property_id", async (req, res) => {
     //Check required information.
     if (!req.params.property_id && req.body.is_favorite) {
       //CASE: Missing some information
-      return res.status(400).send({ message: "error", error: "Bad request." });
+      throw new CustomError.BadRequest();
     }
     const property_id = req.params.property_id;
     const is_favorite = req.body.is_favorite === "true" ? true : false;
-    //Get Token.
-    const cookie = req.cookies["jwt"];
-    //Verify Token.
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    if (claim) {
-      //CASE: Token valid.
-      //Check is user exists?
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1;",
-        [claim.username]
+    //Check Authorization
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new Unauthorized();
+    }
+    const customer = await UserTools.checkIsCustomer(user.username);
+    if (customer) {
+      //Check if property exist?
+      const property_exist_result = await DB.query(
+        "SELECT property_id FROM properties WHERE property_id=$1",
+        [property_id]
       ).catch((err) => {
-        return res.status(500).send({
-          message: "error",
-          error: {
-            type: "database",
-            from: "user_result",
-            code: err.code,
-            detail: err.detail,
-            info: err,
-          },
-        });
+        throw new CustomError.DBError(err, "property_exist_result");
       });
-      if (user_result.rows[0]) {
-        //CASE: User exist.
-        const username = user_result.rows[0].username;
-        //Check if property exist?
-        const property_exist_result = await DB.query(
-          "SELECT property_id FROM properties WHERE property_id=$1",
-          [property_id]
+      if (property_exist_result.rows[0]) {
+        //CASE: Property exists.
+        //Check is property in history.
+        const history_result = await DB.query(
+          "SELECT * FROM history WHERE customer_id=$1 AND property_id=$2;",
+          [customer.customer_id, property_id]
         ).catch((err) => {
-          res.status(500).send({
-            message: "error",
-            error: { code: err.code, detailL: err.detail },
-            full_error: err,
-          });
+          throw new CustomError.DBError(err, "history_result");
         });
-        if (property_exist_result.rows[0]) {
-          //CASE: Property exists.
-          //Check is property in history.
-          const history_result = await DB.query(
-            "SELECT * FROM history WHERE username=$1 AND property_id=$2;",
-            [username, property_id]
-          ).catch((err) => {
-            return res.status(500).send({
-              message: "error",
-              error: {
-                type: "database",
-                from: "history_result",
-                code: err.code,
-                detail: err.detail,
-                info: err,
-              },
-            });
-          });
-          if (history_result.rows[0]) {
-            //CASE: Property is in history.
-            await DB.query(
-              "UPDATE history SET is_favorite=$1, timestamp=CURRENT_TIMESTAMP WHERE username=$2 AND property_id=$3;",
-              [is_favorite, username, property_id]
-            )
-              .then((update_favorite_result) => {
-                return res.status(201).send({
-                  message: "success",
-                  payload: is_favorite,
-                });
-              })
-              .catch((err) => {
-                return res.status(500).send({
-                  message: "error",
-                  error: {
-                    type: "database",
-                    from: "update_favorite_result",
-                    code: err.code,
-                    detail: err.detail,
-                    info: err,
-                  },
-                });
+        if (history_result.rows[0]) {
+          //CASE: Property is in history.
+          await DB.query(
+            "UPDATE history SET is_favorite=$1, timestamp=CURRENT_TIMESTAMP WHERE customer_id=$2 AND property_id=$3;",
+            [is_favorite, customer.customer_id, property_id]
+          )
+            .then((update_favorite_result) => {
+              return res.status(201).send({
+                message: "success",
+                payload: is_favorite,
               });
-          } else {
-            //CASE: Property is not in history.
-            await DB.query(
-              "INSERT INTO history (property_id, username, is_favorite) VALUES ($1, $2, $3);",
-              [req.params.property_id, username, is_favorite]
-            ).catch((err) => {
-              return res.status(500).send({
-                message: "error",
-                error: {
-                  type: "database",
-                  from: "insert_history_result",
-                  code: err.code,
-                  detail: err.detail,
-                  info: err,
-                },
-              });
+            })
+            .catch((err) => {
+              throw new CustomError.DBError(err, "update_favorite_result");
             });
-            await DB.query(
-              "UPDATE properties SET seen=(SELECT seen + 1 FROM properties WHERE property_id=$1) WHERE property_id=$1;",
-              [req.params.property_id]
-            ).catch((err) => {
-              return res.status(500).send({
-                message: "error",
-                error: {
-                  type: "database",
-                  from: "update_property_result",
-                  code: err.code,
-                  detail: err.detail,
-                  info: err,
-                },
-              });
-            });
-            return res.status(201).send({
-              message: "success",
-              payload: is_favorite,
-            });
-          }
         } else {
-          //CASE: Property not found.
-          return res.status(404).send({
-            message: "error",
-            error: "Property not found.",
+          //CASE: Property is not in history.
+          await DB.query(
+            "INSERT INTO history (property_id, customer_id, is_favorite) VALUES ($1, $2, $3);",
+            [property_id, customer.customer_id, is_favorite]
+          ).catch((err) => {
+            throw new CustomError.BadRequest(err, "insert_favorite_result");
+          });
+          await DB.query(
+            "UPDATE properties SET seen=(SELECT seen + 1 FROM properties WHERE property_id=$1) WHERE property_id=$1;",
+            [property_id]
+          ).catch((err) => {
+            throw new CustomError.DBError(err, "update_seen_result");
+          });
+          return res.status(201).send({
+            message: "success",
+            payload: is_favorite,
           });
         }
       } else {
-        //CASE: User not found.
-        return res.status(401).send({
-          message: "error",
-          error: "Unauthorized.",
+        //CASE: Property not found.
+        throw new CustomError.BadRequest("Property not found.");
+      }
+    } else {
+      //CASE: Not a customer.
+      throw new CustomError.Unauthorized();
+    }
+  } catch (err) {
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
+    }
+  }
+});
+// [GET] : Get agent's detail.
+router.get("/agent/", async (req, res) => {
+  try {
+    //Check Authorization.
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new Unauthorized();
+    }
+    const customer = await UserTools.checkIsCustomer(user.username);
+    if (customer) {
+      //CASE: User found.
+      //Check is has agent.
+      if (customer.agent) {
+        //CASE: Has Agent.
+        //Query agents.
+        await DB.query(
+          "SELECT agent_id, full_name, email, phone_number, avatar_id FROM users NATURAL JOIN agents WHERE agent_id=$1",
+          [customer.agent]
+        )
+          .then((agent_result) => {
+            return res.status(200).send({
+              message: "success",
+              payload: agent_result.rows[0],
+            });
+          })
+          .catch((err) => {
+            throw new CustomError.DBError(err, "agent_result");
+          });
+      } else {
+        //CASE: No Agent.
+        return res.status(200).send({
+          message: "success",
+          payload: null,
         });
       }
     } else {
-      //CASE: Token invalid.
-      return res.status(401).send({
-        message: "success",
-        error: "Unauthorized.",
-      });
+      //CASE: Not customer.
+      throw new CustomError.Unauthorized();
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      //CASE: No token.
-      return res.status(401).send({ message: "error", error: "Unauthorized." });
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
     }
-    //CASE: Server error
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: {
-        type: "server",
-        stack: err.stack,
-      },
-    });
   }
 });
 

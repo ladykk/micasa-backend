@@ -1,5 +1,5 @@
 const DB = require("../db");
-
+const CustomError = require("../tools/CustomError");
 const router = require("express").Router();
 
 // Images' functions
@@ -7,10 +7,7 @@ const router = require("express").Router();
 router.get("/avatar/:avatar_id", async (req, res) => {
   try {
     if (!req.params.avatar_id) {
-      return res.status(400).send({
-        message: "error",
-        error: "Bad request.",
-      });
+      throw new CustomError.BadRequest();
     }
     const avatar_id = req.params.avatar_id;
     //Get Data
@@ -20,44 +17,35 @@ router.get("/avatar/:avatar_id", async (req, res) => {
         if (avatar) {
           return res.status(200).end(avatar);
         } else {
-          return res.status(404).send({
-            message: "error",
-            error: "Avatar not found.",
-          });
+          throw new CustomError.NotFound("Avatar not found.");
         }
       })
       .catch((err) => {
-        return res.status(500).send({
-          message: "error",
-          error: {
-            type: "database",
-            from: "avatar_result",
-            code: err.code,
-            detail: err.detail,
-            info: err,
-          },
-        });
+        throw new CustomError.DBError(err, "avatar_result");
       });
   } catch (err) {
-    //CASE: Server error
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: {
-        type: "server",
-        stack: err.stack,
-      },
-    });
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
+    }
   }
 });
 // [GET] : Get images
 router.get("/:image_id", async (req, res) => {
   try {
     if (!req.params.image_id) {
-      return res.status(400).send({
-        message: "error",
-        error: "Bad request.",
-      });
+      throw new CustomError.BadRequest();
     }
     const image_id = req.params.image_id;
     await DB.query("SELECT * FROM images WHERE image_id=$1;", [image_id])
@@ -66,33 +54,28 @@ router.get("/:image_id", async (req, res) => {
         if (image) {
           return res.status(200).end(image);
         } else {
-          return res
-            .status(404)
-            .send({ message: "error", error: "Image not found/" });
+          throw new CustomError.NotFound("Image not found.");
         }
       })
       .catch((err) => {
-        return res.status(500).send({
-          message: "error",
-          error: {
-            type: "database",
-            from: "image_result",
-            code: err.code,
-            detail: err.detail,
-            info: err,
-          },
-        });
+        throw new CustomError.DBError(err, "image_result");
       });
   } catch (err) {
-    //CASE: Server error
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: {
-        type: "server",
-        stack: err.stack,
-      },
-    });
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
+    }
   }
 });
 

@@ -11,6 +11,7 @@ const propertyRoute = require("./routes/property");
 const webmasterRoute = require("./routes/webmaster");
 const customerRoute = require("./routes/customer");
 const agentRoute = require("./routes/agent");
+const reviewsRoute = require("./routes/reviews");
 
 //Middleware
 app.use(express.json());
@@ -30,6 +31,7 @@ app.use("/api/property", propertyRoute);
 app.use("/api/webmaster", webmasterRoute);
 app.use("/api/customer", customerRoute);
 app.use("/api/agent", agentRoute);
+app.use("/api/reviews", reviewsRoute);
 
 app.listen(5000, () =>
   console.log(`Mi Casa Backend: Server started. (${new Date().toUTCString()})`)

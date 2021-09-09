@@ -1,553 +1,614 @@
 require("dotenv/config");
 const router = require("express").Router();
 const DB = require("../db");
-const jwt = require("jsonwebtoken");
 const Property = require("../models/property");
+const UserTools = require("../tools/UserTools");
+const CustomError = require("../tools/CustomError");
 
-//Add Property
+// [POST] : Add property.
 router.post("/add", async (req, res) => {
   try {
-    let isError = false;
-    //Get Token
-    const cookie = req.cookies["jwt"];
-    //Verify Token
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    //Check is invalid
-    if (!claim) {
-      res.status(401).send({
-        message: "error",
-        error: "Unauthorized",
-      });
-      return;
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    const customer = await UserTools.checkIsCustomer(user.username);
+    //Check is customer.
+    if (!customer) {
+      //CASE: User is not a customer.
+      throw new CustomError.Unauthorized("User is not a customer.");
     } else {
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1;",
-        [claim.username]
-      ).catch((err) => {
-        res.status(500).send({
-          message: "error",
-          error: { code: err.code, detailL: err.detail },
-          full_error: err,
-        });
-        return;
-      });
-
-      //Check if user is found.
-      if (!user_result.rows[0]) {
-        res.cookie("jwt", "", { maxAge: 0 });
-        return res
-          .status(401)
-          .status({ message: "error", error: "Unauthorized" });
-      }
-      const seller = user_result.rows[0].username;
+      //CASE: User is a customer.
+      //Check is model correct.
       const new_property = Property.new_property(req.body, req.files);
-
       if (!new_property) {
-        res.status(400).send({ message: "error", error: "Bad request" });
+        //CASE: Model incorrect.
+        throw new CustomError.BadRequest();
       } else {
+        //CASE: Model correct.
+        //Add image_cover.
+        const { data, name } = new_property.images["image_cover"];
+        //Insert image
+        const insert_image_cover_result = await DB.query(
+          "INSERT INTO images (file_name, data) VALUES ($1, $2) RETURNING image_id;",
+          [name, data]
+        ).catch((err) => {
+          throw new CustomError.DBError(err, `insert_image_cover_result`);
+        });
+        const image_cover_id = insert_image_cover_result.rows[0].image_id;
+        if (!image_cover_id) {
+          //CASE: Not return image_id.
+          throw new CustomError.ServerError("Cannot add image_cover");
+        }
+        //Insert property into database.
         const inserted_result = await DB.query(
-          "INSERT INTO properties (property_name, property_type, seller, contract, area, price, rent_payment, rent_requirement, bedroom, bathroom, district, province, near_station, maps_query, furnishing, ownership, air_conditioning, balcony, cctv, concierge, fitness, garden, library, lift, parking, playground, pet_friendly, river_view, security, single_storey, swimming_pool, sport_center, tv, wifi, description) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35) RETURNING property_id;",
+          "INSERT INTO properties (property_name, property_type, price, contract_type, ownership, rent_payment, rent_requirement, area, bedroom, bathroom, furnishing, description, district, province, near_station, maps_query, air_conditioning, balcony, cctv, concierge, fitness, garden, library, lift, parking, playground, pet_friendly, river_view, security, single_storey, swimming_pool, sport_center, tv, wifi, image_cover) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35) RETURNING property_id;",
           [
             new_property.property_name,
             new_property.property_type,
-            seller,
-            new_property.contract,
-            new_property.area,
             new_property.price,
+            new_property.contract_type,
+            new_property.ownership,
             new_property.rent_payment,
             new_property.rent_requirement,
+            new_property.area,
             new_property.bedroom,
             new_property.bathroom,
+            new_property.furnishing,
+            new_property.description,
             new_property.district,
             new_property.province,
             new_property.near_station,
             new_property.maps_query,
-            new_property.furnishing,
-            new_property.ownership,
-            new_property.facilities.air_conditioning,
-            new_property.facilities.balcony,
-            new_property.facilities.cctv,
-            new_property.facilities.concierge,
-            new_property.facilities.fitness,
-            new_property.facilities.garden,
-            new_property.facilities.library,
-            new_property.facilities.lift,
-            new_property.facilities.parking,
-            new_property.facilities.playground,
-            new_property.facilities.pet_friendly,
-            new_property.facilities.river_view,
-            new_property.facilities.security,
-            new_property.facilities.single_storey,
-            new_property.facilities.swimming_pool,
-            new_property.facilities.sport_center,
-            new_property.facilities.tv,
-            new_property.facilities.wifi,
-            new_property.description,
+            new_property.air_conditioning,
+            new_property.balcony,
+            new_property.cctv,
+            new_property.concierge,
+            new_property.fitness,
+            new_property.garden,
+            new_property.library,
+            new_property.lift,
+            new_property.parking,
+            new_property.playground,
+            new_property.pet_friendly,
+            new_property.river_view,
+            new_property.security,
+            new_property.single_storey,
+            new_property.swimming_pool,
+            new_property.sport_center,
+            new_property.tv,
+            new_property.wifi,
+            image_cover_id,
           ]
         ).catch((err) => {
-          res.status(500).send({
-            message: "error",
-            error: { code: err.code, detailL: err.detail },
-            full_error: err,
-          });
+          throw new CustomError.DBError(err, "inserted_result");
         });
-
+        //Check is return property id.
         if (inserted_result.rows[0].property_id) {
+          //CASE: Return property_id
           const property_id = Number.parseInt(
             inserted_result.rows[0].property_id,
             10
           );
+          //Update owner of property.
+          await DB.query(
+            "INSERT INTO owners (customer_id, property_id) VALUES ($1, $2);",
+            [customer.customer_id, property_id]
+          ).catch((err) => {
+            throw new CustomError.DBError(err, " update_owner_result");
+          });
+          //Insert images
           for (let id in new_property.images) {
-            if (isError) {
-              break;
-            } else if (!new_property.images[id]) {
+            //Check is image is null.
+            if (!new_property.images[id]) {
+              //CASE: Image is null
+              continue;
+            } else if (id === "image_cover") {
+              //CASE: Is image_cover;
               continue;
             } else {
+              //CASE: Image not null
               const { data, name } = new_property.images[id];
-              const image_result = await DB.query(
+              //Insert image
+              await DB.query(
                 "INSERT INTO images (file_name, data) VALUES ($1, $2) RETURNING image_id;",
                 [name, data]
-              ).catch((err) => {
-                res.status(500).send({
-                  message: "error",
-                  error: { code: err.code, detailL: err.detail },
-                  full_error: err,
-                });
-                isError = true;
-              });
-              if (image_result.rows[0].image_id) {
-                const image_id = Number.parseInt(
-                  image_result.rows[0].image_id,
-                  10
-                );
-                await DB.query(
-                  `UPDATE properties SET ${id}=$1 WHERE property_id=$2`,
-                  [image_id, property_id]
-                ).catch((err) => {
-                  res.status(500).send({
-                    message: "error",
-                    error: { code: err.code, detailL: err.detail },
-                    full_error: err,
+              )
+                .then(async (insert_image_result) => {
+                  await DB.query(
+                    `UPDATE properties SET ${id}=$1 WHERE property_id=$2`,
+                    [insert_image_result.rows[0].image_id, property_id]
+                  ).catch((err) => {
+                    throw new CustomError.DBError(err, `update_${id}_result`);
                   });
-                  isError = true;
+                })
+                .catch((err) => {
+                  throw new CustomError.DBError(err, `insert_${id}_result`);
                 });
-              }
             }
           }
-          if (!isError) {
-            res.status(201).send({ message: "success" });
-          }
+          return res.status(201).send({ message: "success" });
+        } else {
+          //CASE: Not return property id.
+          throw new CustomError.ServerError("not return property_id.");
         }
       }
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      res.status(401).send({ message: "error", error: "Unauthorized" });
-      return;
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
     }
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: err.stack,
-    });
   }
 });
-
-//Edit Property
+// [GET] : Get property for edit.
 router.get("/edit/:property_id", async (req, res) => {
   try {
+    //Check required information.
     if (!req.params.property_id) {
-      res.status(400).send({ message: "error", error: "Bad request." });
-      return;
+      //CASE: Some information missing.
+      throw new CustomError.BadRequest();
     }
-    //Get Token
-    const cookie = req.cookies["jwt"];
-    //Verify Token
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    //Check is invalid
-    if (!claim) {
-      res.status(401).send({
-        message: "error",
-        error: "Unauthorized",
-      });
-      return;
+    const property_id = req.params.property_id;
+    //Check Authorization.
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    const customer = await UserTools.checkIsCustomer(user.username);
+    //Check is a customer.
+    if (!customer) {
+      //CASE: Not a customer
+      throw new CustomError.Unauthorized();
     } else {
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1;",
-        [claim.username]
+      //Check if user is an owner.
+      const owner_result = await DB.query(
+        "SELECT * FROM owners WHERE customer_id=$1 AND property_id=$2",
+        [customer.customer_id, property_id]
       ).catch((err) => {
-        res.status(500).send({
-          message: "error",
-          error: { code: err.code, detailL: err.detail },
-          full_error: err,
-        });
-        return;
+        throw new CustomError.DBError(err, "owner_result");
       });
-
-      //Check if user is found.
-      if (!user_result.rows[0]) {
-        return res
-          .status(401)
-          .status({ message: "error", error: "Unauthorized" });
-      }
-      const seller = user_result.rows[0].username;
-      const property_result = await DB.query(
-        "SELECT * FROM properties WHERE property_id=$1 AND seller=$2;",
-        [req.params.property_id, seller]
-      ).catch((err) => {
-        res.status(500).send({
-          message: "error",
-          error: { code: err.code, detailL: err.detail },
-          full_error: err,
+      if (owner_result.rows[0]) {
+        //CASE: Is an owner
+        const property_result = await DB.query(
+          "SELECT * FROM properties WHERE property_id=$1",
+          [property_id]
+        ).catch((err) => {
+          throw new CustomError.DBError(err, "property_result");
         });
-      });
-      if (property_result.rows[0]) {
-        const property = Property.property(property_result.rows[0]);
-        res.status(200).send({ message: "success", payload: property });
+        //Check is found property.
+        if (property_result.rows[0]) {
+          //CASE: Found property.
+          const property = Property.property(property_result.rows[0]);
+          return res
+            .status(200)
+            .send({ message: "success", payload: property });
+        } else {
+          //CASE: Not found property.
+          throw new CustomError.NotFound("Property not found.");
+        }
       } else {
-        return res
-          .status(401)
-          .send({ message: "error", error: "Unauthorized" });
+        throw new CustomError.Unauthorized();
       }
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      res.status(401).send({ message: "error", error: "Unauthorized" });
-      return;
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
     }
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: err.stack,
-    });
   }
 });
+// [PATCH] : Update property.
 router.patch("/edit/:property_id", async (req, res) => {
   try {
-    let isError = false;
+    //Check require information.
     if (!req.params.property_id) {
-      res.status(400).send({ message: "error", error: "Bad request." });
-      return;
+      //CASE: Some information missing.
+      throw new CustomError.BadRequest();
     }
-    //Get Token
-    const cookie = req.cookies["jwt"];
-    //Verify Token
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    //Check is invalid
-    if (!claim) {
-      res.status(401).send({
-        message: "error",
-        error: "Unauthorized",
-      });
-      return;
+    const property_id = req.params.property_id;
+    //Check Authorization
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    const customer = await UserTools.checkIsCustomer(user.username);
+    if (!customer) {
+      //CASE: Not a customer
+      throw new CustomError.Unauthorized();
     } else {
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1;",
-        [claim.username]
+      //Check if user is an owner.
+      const owner_result = await DB.query(
+        "SELECT * FROM owners WHERE customer_id=$1 AND property_id=$2",
+        [customer.customer_id, property_id]
       ).catch((err) => {
-        res.status(500).send({
-          message: "error",
-          error: { code: err.code, detailL: err.detail },
-          full_error: err,
-        });
-        return;
+        throw new CustomError.DBError(err, "owner_result");
       });
-
-      //Check if user is found.
-      if (!user_result.rows[0]) {
-        res.cookie("jwt", "", { maxAge: 0 });
-        return res
-          .status(401)
-          .status({ message: "error", error: "Unauthorized" });
-      }
-      const seller = user_result.rows[0].username;
-      const property_result = await DB.query(
-        "SELECT * FROM properties WHERE property_id=$1 AND seller=$2;",
-        [req.params.property_id, seller]
-      ).catch((err) => {
-        res.status(500).send({
-          message: "error",
-          error: { code: err.code, detailL: err.detail },
-          full_error: err,
+      if (owner_result.rows[0]) {
+        //CASE: Is an owner
+        //Check is found property.
+        const property_result = await DB.query(
+          "SELECT * FROM properties WHERE property_id=$1",
+          [property_id]
+        ).catch((err) => {
+          throw new CustomError.DBError(err, "property_result");
         });
-      });
-      if (property_result.rows[0]) {
-        const property = Property.property(property_result.rows[0]);
-        const status = property.status;
-        switch (status) {
-          case "Sold":
-            res.status(401).send({
-              message: "error",
-              property: "Property already sold out.",
-            });
-          default:
-        }
-        const update_data = Property.update_data(req.body, req.files);
-        if (update_data.isChange) {
-          if (update_data.info && !isError) {
-            for (let attribute in update_data.info) {
-              if (isError) {
-                break;
-              }
-              await DB.query(
-                `UPDATE properties SET ${attribute}=$1 WHERE property_id=$2;`,
-                [update_data.info[attribute], property.property_id]
-              ).catch((err) => {
-                res.status(500).send({
-                  message: "error",
-                  error: { code: err.code, detailL: err.detail },
-                  full_error: err,
-                });
-                isError = true;
-              });
-            }
-          }
-          if (update_data.images && !isError) {
-            for (let attribute in update_data.images) {
-              if (isError) {
-                break;
-              }
-              if (update_data.images[attribute] === "Remove") {
-                await DB.query("DELETE FROM images WHERE image_id=$1;", [
-                  property.images[attribute],
-                ]).catch((err) => {
-                  res.status(500).send({
-                    message: "error",
-                    error: { code: err.code, detailL: err.detail },
-                    full_error: err,
-                  });
-                  isError = true;
-                });
-                continue;
-              }
-              const { name, data } = update_data.images[attribute];
-              if (property.images[attribute] !== null) {
-                await DB.query(
-                  `UPDATE images SET file_name=$1, data=$2 WHERE image_id=$3;`,
-                  [name, data, property.images[attribute]]
-                ).catch((err) => {
-                  res.status(500).send({
-                    message: "error",
-                    error: { code: err.code, detailL: err.detail },
-                    full_error: err,
-                  });
-                  isError = true;
-                });
-              } else {
-                const insert_image_result = await DB.query(
-                  "INSERT INTO images (file_name, data) VALUES($1,$2) RETURNING image_id;",
-                  [name, data]
-                ).catch((err) => {
-                  res.status(500).send({
-                    message: "error",
-                    error: { code: err.code, detailL: err.detail },
-                    full_error: err,
-                  });
-                  isError = true;
-                });
-                if (insert_image_result.rows[0].image_id && !isError) {
-                  const image_id = insert_image_result.rows[0].image_id;
+        if (property_result.rows[0]) {
+          //CASE: Property found
+          const property = property_result.rows[0];
+          const status = property.status;
+          //Check is Sold.
+          if (status === "Sold") {
+            //CASE: Property is being sold.
+            throw new CustomError.Unauthorized("Property is already sold");
+          } else {
+            //CASE: Property is not sold.
+            const update_data = Property.update_data(req.body, req.files);
+            //Check is sold
+            if (update_data.info["status"] === "Sold") {
+              //CASE: Sold property
+              //Check is have buyer
+              if (update_data.buyer) {
+                //CASE: Has buyer
+                //Check is buyer exist.
+                const buyer = await UserTools.checkIsCustomer(
+                  update_data.buyer
+                );
+                if (buyer) {
+                  //CASE: Has buyer
+                  //Insert into buyer
                   await DB.query(
-                    `UPDATE properties SET ${attribute}=$1 WHERE property_id=$2;`,
-                    [image_id, property.property_id]
-                  ).catch((err) => {
-                    res.status(500).send({
-                      message: "error",
-                      error: { code: err.code, detailL: err.detail },
-                      full_error: err,
+                    "INSERT INTO buyers (customer_id, property_id) VALUES ($1, $2);",
+                    [buyer.customer_id, property_id]
+                  )
+                    .then(async (insert_buyer_result) => {
+                      //Insert into reviews
+                      await DB.query(
+                        "INSERT INTO reviews (customer_id, property_id, role) VALUES ($1, $2, 'Buyer')",
+                        [buyer.customer_id, property_id]
+                      ).catch((err) => {
+                        throw new CustomError.DBError(
+                          err,
+                          "insert_buyer_review_result"
+                        );
+                      });
+                      //Check is owner is MI CASA account
+                      if (customer.username !== "property") {
+                        //CASE: Not MI CASA Account
+                        await DB.query(
+                          "INSERT INTO reviews (customer_id, property_id, role) VALUES ($1, $2, 'Seller')",
+                          [customer.customer_id, property_id]
+                        ).catch((err) => {
+                          throw new CustomError.DBError(
+                            err,
+                            "insert_seller_review_result"
+                          );
+                        });
+                      }
+                    })
+                    .catch((err) => {
+                      throw new CustomError.DBError(err, "insert_buyer_result");
                     });
-                    isError = true;
+                } else {
+                  //CASE: Buyer not exist.
+                  throw new CustomError.BadRequest("Buyer not exist.");
+                }
+              } else {
+                throw new CustomError.BadRequest("Sold without buyer.");
+              }
+            }
+            //Check is there a update.
+            if (update_data.isChange) {
+              //CASE: Changes.
+              //Update infos values.
+              for (let attribute in update_data.info) {
+                await DB.query(
+                  `UPDATE properties SET ${attribute}=$1 WHERE property_id=$2;`,
+                  [update_data.info[attribute], property_id]
+                ).catch((err) => {
+                  throw new CustomError.DBError(
+                    err,
+                    `update_${attribute}_result`
+                  );
+                });
+              }
+              //Update images value.
+              for (let attribute in update_data.images) {
+                //Check image change.
+                if (update_data.images[attribute] === "Remove") {
+                  //CASE: Remove image.
+                  await DB.query("DELETE FROM images WHERE image_id=$1;", [
+                    property[attribute],
+                  ]).catch((err) => {
+                    throw new CustomError.DBError(
+                      err,
+                      `remove_${attribute}_result`
+                    );
                   });
+                } else {
+                  //CASE: Update image.
+                  const { name, data } = update_data.images[attribute];
+                  //Check is has image.
+                  if (property[attribute] !== null) {
+                    //CASE: Has image.
+                    //Update file.
+                    await DB.query(
+                      `UPDATE images SET file_name=$1, data=$2 WHERE image_id=$3;`,
+                      [name, data, property[attribute]]
+                    ).catch((err) => {
+                      throw new CustomError.DBError(
+                        err,
+                        `update_${attribute}_result`
+                      );
+                    });
+                  } else {
+                    //CASE: No image.
+                    //Insert file.
+                    const insert_image_result = await DB.query(
+                      "INSERT INTO images (file_name, data) VALUES($1,$2) RETURNING image_id;",
+                      [name, data]
+                    ).catch((err) => {
+                      throw new CustomError.DBError(
+                        err,
+                        `insert_${attribute}_result`
+                      );
+                    });
+                    //Check is return image_id.
+                    if (insert_image_result.rows[0].image_id) {
+                      //CASE: image_id returned.
+                      const image_id = insert_image_result.rows[0].image_id;
+                      await DB.query(
+                        `UPDATE properties SET ${attribute}=$1 WHERE property_id=$2;`,
+                        [image_id, property_id]
+                      ).catch((err) => {
+                        throw new CustomError.DBError(
+                          err,
+                          `update_${attribute}_result`
+                        );
+                      });
+                    } else {
+                      //CASE: image_id not returned.
+                      throw new CustomError.ServerError(
+                        `${attribute} not return image_id after insert.`
+                      );
+                    }
+                  }
                 }
               }
             }
-          }
-          if (!isError) {
-            res
-              .status(201)
-              .send({ message: "success", change: "changes saved." });
+            return res.status(201).send({ message: "success" });
           }
         } else {
-          res.status(200).send({ message: "success", change: "no change" });
+          //CASE: Not found property.
+          throw new CustomError.NotFound("Property not found.");
         }
       } else {
-        return res
-          .status(401)
-          .send({ message: "error", error: "Unauthorized" });
+        //CASE: Not an owner.
+        throw new CustomError.Unauthorized();
       }
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      res.status(401).send({ message: "error", error: "Unauthorized" });
-      return;
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
     }
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: err.stack,
-    });
   }
 });
-
-//Get Property
+// [GET] : Get property by id.
 router.get("/id/:property_id", async (req, res) => {
-  let property;
-  let username;
+  let property = null;
+  let property_id = null;
+  let user;
+  let is_query_property = false;
+  let is_response_sent = false;
   try {
+    //Check required information.
     if (!req.params.property_id) {
-      res.status(400).send({ message: "error", error: "Bad request." });
-      return;
+      throw new CustomError.BadRequest();
     }
-    //Get Token
-    const cookie = req.cookies["jwt"];
-    //Verify Token
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    if (claim) {
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1;",
-        [claim.username]
+    property_id = req.params.property_id;
+    //Check Authorization.
+    user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    const customer = await UserTools.checkIsCustomer(user.username);
+    //Check is a customer.
+    if (customer) {
+      //CASE: User is a customer
+      //Query property
+      const property_result = await DB.query(
+        "SELECT * FROM properties WHERE property_id=$1",
+        [property_id]
       ).catch((err) => {
-        res.status(500).send({
-          message: "error",
-          error: { code: err.code, detailL: err.detail },
-          full_error: err,
-        });
-        return;
+        throw new CustomError.DBError(err, "property_result");
       });
-
-      //Check if user is found.
-      if (user_result.rows[0]) {
-        username = user_result.rows[0].username;
-        const customer_result = await DB.query(
-          "SELECT username FROM agents WHERE username=$1 UNION SELECT username FROM webmasters WHERE username=$1;",
-          [username]
-        );
-        const isCustomer = customer_result.rows[0] ? false : true;
-        if (username && isCustomer) {
-          const property_exist_result = await DB.query(
-            "SELECT property_id FROM properties WHERE property_id=$1",
-            [req.params.property_id]
+      //Check is property exist.
+      if (property_result.rows[0]) {
+        //CASE: Property is exist.
+        //Set property
+        property = Property.property(property_result.rows[0]);
+        //Check is property in history
+        const history_result = await DB.query(
+          "SELECT * FROM history WHERE customer_id=$1 AND property_id=$2;",
+          [customer.customer_id, property_id]
+        ).catch((err) => {
+          throw new CustomError.DBError(err, "history_result");
+        });
+        if (history_result.rows[0]) {
+          //CASE: Property is in history.
+          //Update Timestamp.
+          await DB.query(
+            "UPDATE history SET timestamp=CURRENT_TIMESTAMP WHERE customer_id=$1 AND property_id=$2;",
+            [customer.customer_id, property_id]
           ).catch((err) => {
-            res.status(500).send({
-              message: "error",
-              error: { code: err.code, detailL: err.detail },
-              full_error: err,
-            });
+            throw new CustomError.DBError(err, "update_history_result");
           });
-          if (property_exist_result.rows[0]) {
-            const history_result = await DB.query(
-              "SELECT * FROM history WHERE username=$1 AND property_id=$2;",
-              [username, req.params.property_id]
-            ).catch((err) => {
-              res.status(500).send({
-                message: "error",
-                error: { code: err.code, detailL: err.detail },
-                full_error: err,
-              });
-            });
-            if (history_result.rows[0]) {
-              await DB.query(
-                "UPDATE history SET timestamp=CURRENT_TIMESTAMP WHERE username=$1 AND property_id=$2;",
-                [username, req.params.property_id]
-              ).catch((err) => {
-                res.status(500).send({
-                  message: "error",
-                  error: { code: err.code, detailL: err.detail },
-                  full_error: err,
-                });
-              });
-            } else {
-              await DB.query(
-                "INSERT INTO history (property_id, username) VALUES ($1, $2);",
-                [req.params.property_id, username]
-              ).catch((err) => {
-                res.status(500).send({
-                  message: "error",
-                  error: { code: err.code, detailL: err.detail },
-                  full_error: err,
-                });
-              });
-              console.log("inserted");
+        } else {
+          //CASE: Property is not in history.
+          await DB.query(
+            "INSERT INTO history (property_id, customer_id) VALUES ($1, $2);",
+            [property_id, customer.customer_id]
+          )
+            .then(async (insert_history_result) => {
               await DB.query(
                 "UPDATE properties SET seen=(SELECT seen + 1 FROM properties WHERE property_id=$1) WHERE property_id=$1;",
-                [req.params.property_id]
+                [property_id]
               ).catch((err) => {
-                res.status(500).send({
-                  message: "error",
-                  error: { code: err.code, detailL: err.detail },
-                  full_error: err,
-                });
+                throw new CustomError.DBError(err, "update_seen_result");
+              });
+            })
+            .catch((err) => {
+              throw new CustomError.DBError(err, "insert_history_result");
+            });
+        }
+        is_query_property = true;
+      } else {
+        throw new CustomError.NotFound("Property not found.");
+      }
+    }
+  } catch (err) {
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
+    }
+    is_response_sent = true;
+  } finally {
+    //Check is response not sent.
+    if (!is_response_sent) {
+      try {
+        //CASE: Response is not sent
+        //Check is query.
+        if (!is_query_property) {
+          //CASE: Not query
+          const property_result = await DB.query(
+            "SELECT * FROM properties WHERE property_id=$1",
+            [property_id]
+          ).catch((err) => {
+            throw new CustomError.DBError(err, "property_result (finally)");
+          });
+          if (property_result.rows[0]) {
+            property = Property.property(property_result.rows[0]);
+          }
+        }
+        //Check is property found
+        if (!property) {
+          //CASE: Property not found.
+          throw new CustomError.NotFound("Property not found.");
+        } else {
+          //CASE: Property found.
+          //Check is there is user
+          if (user) {
+            //Check is user a webmaster.
+            const webmaster = await UserTools.checkIsWebmaster(user.username);
+            if (webmaster) {
+              //CASE: User is webmaster
+              return res.status(200).send({
+                message: "success",
+                payload: property,
               });
             }
           }
+          //Check status of property
+          switch (property.status) {
+            //CASE: Not allow.
+            case "Pending":
+            case "Rejected":
+              throw new CustomError.Unauthorized();
+            //CASE: Allow.
+            default:
+              return res.status(200).send({
+                message: "success",
+                payload: property,
+              });
+          }
+        }
+      } catch (err_finally) {
+        const { status, error } = CustomError.handleResponse(err_finally);
+        if (status) {
+          res.status(status).send({
+            message: "error",
+            error,
+          });
+        } else {
+          res.status(500).send({
+            message: "error",
+            error: {
+              type: "server",
+              stack: err_finally.stack,
+            },
+          });
         }
       }
     }
-  } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      return;
-    }
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: err.stack,
-    });
-  } finally {
-    const property_result = await DB.query(
-      "SELECT * FROM properties WHERE property_id=$1;",
-      [req.params.property_id]
-    ).catch((err) => {
-      res.status(500).send({
-        message: "error",
-        error: { code: err.code, detailL: err.detail },
-        full_error: err,
-      });
-    });
-    if (property_result.rows[0]) {
-      const webmaster_result = await DB.query(
-        "SELECT * FROM webmasters WHERE username=$1;",
-        [username]
-      ).catch((err) => {
-        res.status(500).send({
-          message: "error",
-          error: { code: err.code, detailL: err.detail },
-          full_error: err,
-        });
-      });
-      const isWebmaster = webmaster_result.rows[0] ? true : false;
-      property = Property.property(property_result.rows[0]);
-      if (isWebmaster) {
-        res.status(200).send({ message: "success", payload: property });
-      } else if (
-        property.status === "Pending" ||
-        property.status === "Rejected"
-      ) {
-        res.status(401).send({ message: "error", error: "Unauthorized." });
-      } else {
-        res.status(200).send({ message: "success", payload: property });
-      }
-    } else {
-      return res
-        .status(404)
-        .send({ message: "error", error: "Property not found." });
-    }
   }
 });
-
-//Get Properties
+// [GET] : Get properties by query.
 router.get("/query", async (req, res) => {
-  let property;
   try {
     let params = {
       furnishing: [],
       ownership: [],
     };
+    //Get params
     for (let attribute in req.query) {
       switch (attribute) {
         case "terms":
           params[attribute] = `'%${req.query[attribute].toLowerCase()}%'`;
           break;
-        case "contract":
+        case "contract_type":
           switch (req.query[attribute]) {
             case "buy":
               params[attribute] = "'Sell'";
@@ -607,13 +668,14 @@ router.get("/query", async (req, res) => {
         case "single_storey":
         case "sport_center":
         case "wifi":
-          if (req.query[attribute] === "false") {
+          if (req.query[attribute] === "true") {
             params[attribute] = req.query[attribute];
           }
           break;
         default:
       }
     }
+    //Convert params to where cause.
     let where_cause = "";
     for (let param in params) {
       switch (param) {
@@ -635,13 +697,13 @@ router.get("/query", async (req, res) => {
         case "furnishing":
           if (params[param].length > 0) {
             let furnishing = params[param].join(",");
-            where_cause += `AND furnishing not in (${furnishing}) `;
+            where_cause += `AND furnishing in (${furnishing}) `;
           }
           break;
         case "ownership":
           if (params[param].length > 0) {
             let ownership = params[param].join(",");
-            where_cause += `AND ownership not in (${ownership}) `;
+            where_cause += `AND ownership in (${ownership}) `;
           }
           break;
         default:
@@ -649,184 +711,144 @@ router.get("/query", async (req, res) => {
       }
     }
     where_cause = `WHERE status='Listing' ${where_cause}`;
+    //Query
     const properties_result = await DB.query(
       `SELECT * FROM properties ${where_cause};`
     ).catch((err) => {
-      res.status(500).send({
-        message: "error",
-        error: { code: err.code, detailL: err.detail },
-        full_error: err,
-      });
-      return;
+      throw new CustomError.DBError(err, "properties_result");
     });
+    //Check is null
     if (properties_result.rows) {
+      //CASE: Not null
+      //Format
       let format_properties = properties_result.rows.map((property) =>
         Property.property(property)
       );
       res.status(200).send({ message: "success", payload: format_properties });
     } else {
+      //CASE: Null
       res.status(200).send({ message: "success", payload: [] });
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      return;
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
     }
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: err.stack,
-    });
   }
 });
-
-//Get Own Property
-router.get("/seller/", async (req, res) => {
+// [GET] : Get own properties
+router.get("/owned/", async (req, res) => {
   try {
-    //Get Token
-    const cookie = req.cookies["jwt"];
-    //Verify Token
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    //Check is invalid
-    if (!claim) {
-      res.status(401).send({
-        message: "error",
-        error: "Unauthorized",
-      });
-      return;
-    } else {
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1;",
-        [claim.username]
+    //Check Authorization
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    const customer = await UserTools.checkIsCustomer(user.username);
+    if (customer) {
+      //CASE: User is a customer.
+      const properties_result = await DB.query(
+        "SELECT * FROM properties NATURAL JOIN owners WHERE customer_id=$1 ORDER BY property_id;",
+        [customer.customer_id]
       ).catch((err) => {
-        res.status(500).send({
-          message: "error",
-          error: { code: err.code, detailL: err.detail },
-          full_error: err,
-        });
-        return;
+        throw new CustomError.DBError(err, "properties_result");
       });
-
-      //Check if user is found.
-      if (!user_result.rows[0]) {
-        return res
-          .status(401)
-          .status({ message: "error", error: "Unauthorized" });
-      }
-      const seller = user_result.rows[0].username;
-      const property_result = await DB.query(
-        "SELECT * FROM properties WHERE seller=$1 ORDER BY property_id;",
-        [seller]
-      ).catch((err) => {
-        res.status(500).send({
-          message: "error",
-          error: { code: err.code, detailL: err.detail },
-          full_error: err,
-        });
-      });
-      if (property_result.rows) {
-        const property = property_result.rows.map((property) => {
+      //Check is properties null
+      if (properties_result.rows) {
+        //CASE: Not null
+        //Format
+        const properties = properties_result.rows.map((property) => {
           return Property.property(property);
         });
-        res.status(200).send({ message: "success", payload: property });
+        res.status(200).send({ message: "success", payload: properties });
       } else {
-        return res
-          .status(401)
-          .send({ message: "error", error: "Unauthorized" });
+        //CASE: Null
+        res.status(200).send({ message: "success", payload: [] });
       }
+    } else {
+      //CASE: User is not a customer.
+      throw new CustomError.Unauthorized();
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      res.status(401).send({ message: "error", error: "Unauthorized" });
-      return;
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
     }
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: err.stack,
-    });
   }
 });
-
-//Get Property Seller
+// [GET] : Get owner's contact.
 router.get("/contact/:property_id", async (req, res) => {
   try {
+    //Check required information
     if (!req.params.property_id) {
       res.status(400).send({ message: "error", error: "Bad request." });
       return;
     }
-    //Get Token
-    const cookie = req.cookies["jwt"];
-    //Verify Token
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    //Check is invalid
-    if (!claim) {
-      res.status(401).send({
-        message: "error",
-        error: "Unauthorized",
+    const property_id = req.params.property_id;
+    //Check Authorization.
+    const user = UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    //Check is user a staff.
+    const staff = UserTools.checkIsStaff(user.username);
+    if (staff) {
+      //CASE: User is staff.
+      const owner_result = await DB.query(
+        "SELECT username, full_name, email, phone_number, avatar_id FROM users INNER JOIN customers USING(username) INNER JOIN owners USING(customer_id) WHERE property_id=$1;",
+        [property_id]
+      ).catch((err) => {
+        throw new CustomError.DBError(err, "owner_result");
       });
-      return;
+      res
+        .status(200)
+        .send({ message: "success", payload: owner_result.rows[0] });
     } else {
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1;",
-        [claim.username]
-      ).catch((err) => {
-        res.status(500).send({
-          message: "error",
-          error: { code: err.code, detailL: err.detail },
-          full_error: err,
-        });
-        return;
-      });
-
-      //Check if user is found.
-      if (!user_result.rows[0]) {
-        return res
-          .status(401)
-          .status({ message: "error", error: "Unauthorized" });
-      }
-      const admin_result = await DB.query(
-        "SELECT username FROM agents WHERE username=$1 UNION SELECT username FROM webmasters WHERE username=$2;",
-        [user_result.rows[0].username, user_result.rows[0].username]
-      ).catch((err) => {
-        res.status(500).send({
-          message: "error",
-          error: { code: err.code, detailL: err.detail },
-          full_error: err,
-        });
-        return;
-      });
-      if (admin_result.rows[0]) {
-        const seller_result = await DB.query(
-          "SELECT username, full_name, email, phone_number, avatar_id FROM users INNER JOIN properties ON users.username = properties.seller WHERE property_id=$1;",
-          [req.params.property_id]
-        ).catch((err) => {
-          res.status(500).send({
-            message: "error",
-            error: { code: err.code, detailL: err.detail },
-            full_error: err,
-          });
-          return;
-        });
-        res
-          .status(200)
-          .send({ message: "success", payload: seller_result.rows[0] });
-      } else {
-        res.status(401).send({
-          message: "error",
-          error: "Unauthorized",
-        });
-      }
+      //CASE: User is not a staff.
+      throw new CustomError.Unauthorized();
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      res.status(401).send({ message: "error", error: "Unauthorized" });
-      return;
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
     }
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: err.stack,
-    });
   }
 });
 

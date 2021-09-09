@@ -1,431 +1,221 @@
 const router = require("express").Router();
 const DB = require("../db");
-const jwt = require("jsonwebtoken");
+const UserTools = require("../tools/UserTools");
+const CustomError = require("../tools/CustomError");
 
 // Agents' functions
-// [GET] : Get customers of an agent.
+
+// [GET] : /customers
 router.get("/customers/", async (req, res) => {
+  /*
+      DO: Return a list of customers of the agent.
+      ERROR:  1. Unauthorized.
+              2. DBError.
+  */
   try {
-    //Get Token.
-    const cookie = req.cookies["jwt"];
-    //Verify Token.
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    //Check is token invalid?
-    if (!claim) {
-      //CASE: Token invalid.
-      return res.status(401).send({
-        message: "error",
-        error: "Unauthorized.",
-      });
-    } else {
-      //CASE: Token valid.
-      //Check if user exists?
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1; ",
-        [claim.username]
-      ).catch((err) => {
-        return res.status(500).send({
-          message: "error",
-          error: {
-            type: "database",
-            from: "user_result",
-            code: err.code,
-            detail: err.detail,
-            info: err,
-          },
-        });
-      });
-      if (!user_result.rows[0]) {
-        //CASE: User not found.
-        res.cookie("jwt", "", { maxAge: 0 });
-        return res
-          .status(401)
-          .status({ message: "error", error: "Unauthorized" });
-      }
-      const user = user_result.rows[0];
-      //Check user is an agent?
-      const agent_result = await DB.query(
-        "SELECT * FROM agents WHERE username=$1;",
-        [user.username]
-      ).catch((err) => {
-        return res.status(500).send({
-          message: "error",
-          error: {
-            type: "database",
-            from: "agent_result",
-            code: err.code,
-            detail: err.detail,
-            info: err,
-          },
-        });
-      });
-      const agent = agent_result.rows[0];
-      if (agent) {
-        //CASE: User is an agent.
-        await DB.query(
-          "SELECT * FROM users INNER JOIN agent_customers USING(username) WHERE agent_id = $1;",
-          [agent.agent_id]
-        )
-          .then((agent_customers_result) => {
-            return res.status(200).send({
-              message: "success",
-              payload: agent_customers_result.rows,
-            });
-          })
-          .catch((err) => {
-            return res.status(500).send({
-              message: "error",
-              error: {
-                type: "database",
-                from: "agent_customers_result",
-                code: err.code,
-                detail: err.detail,
-                info: err,
-              },
-            });
+    //Check Authorization.
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      //CASE: User not found.
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    const agent = await UserTools.checkIsAgent(user.username);
+    if (agent) {
+      //CASE: User is an agent.
+      /*
+          Retrieve: customer_id, username, full_name, email, phone_number, gender, birthday, avatar_id;
+      */
+      await DB.query(
+        "SELECT customer_id, users.username AS username, full_name, email, phone_number, gender, birthday, avatar_id FROM users INNER JOIN customers USING(username) WHERE agent = $1;",
+        [agent.agent_id]
+      )
+        .then((customers_result) => {
+          return res.status(200).send({
+            message: "success",
+            payload: customers_result.rows,
           });
-      } else {
-        //CASE: User is not an agent.
-        res.status(401).send({ message: "error", error: "Unauthorized" });
-      }
+        })
+        .catch((err) => {
+          throw new CustomError.DBError(err, "customers_result");
+        });
+    } else {
+      //CASE: User is not an agent.
+      throw new CustomError.Unauthorized();
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      //CASE: No Token
-      return res.status(401).send({ message: "error", error: "Unauthorized" });
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
     }
-    //CASE: Server error
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: {
-        type: "server",
-        stack: err.stack,
-      },
-    });
   }
 });
-// [POST] : Add customer to an agent.
+// [POST] : /customers/add
 router.post("/customers/add", async (req, res) => {
+  /*
+      DO: Update customer's agent to be the agent.
+      ERROR:  1. Bad Request
+              2. Unauthorized
+  */
   try {
     //Check required information
     if (!req.body.username && !req.body.agent_username) {
       //CASE: Missing some information.
-      return res.status(400).send({
-        message: "error",
-        error: "Bad request.",
-      });
+      throw new CustomError.BadRequest();
     }
-    //Get Token.
-    const cookie = req.cookies["jwt"];
-    //Verify Token.
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    //Check is token valid?
-    if (!claim) {
-      //CASE: Token invalid.
-      return res.status(401).send({
-        message: "error",
-        error: "Unauthorized",
-      });
-    } else {
-      //CASE: Token valid.
-      //Check is user exists.
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1;",
-        [claim.username]
-      ).catch((err) => {
-        return res.status(500).send({
-          message: "error",
-          error: {
-            type: "database",
-            from: "user_result",
-            code: err.code,
-            detail: err.detail,
-            info: err,
-          },
-        });
-      });
-      if (!user_result.rows[0]) {
-        //CASE: User not exists.
-        res.cookie("jwt", "", { maxAge: 0 });
-        return res
-          .status(401)
-          .status({ message: "error", error: "Unauthorized" });
-      }
-      const user = user_result.rows[0];
-      //Check is user is an agent?
-      const agent_result = await DB.query(
-        "SELECT * FROM agents WHERE username=$1;",
-        [user.username]
-      ).catch((err) => {
-        return res.status(500).send({
-          message: "error",
-          error: {
-            type: "database",
-            from: "agent_result",
-            code: err.code,
-            detail: err.detail,
-            info: err,
-          },
-        });
-      });
-      const agent = agent_result.rows[0];
-      if (agent) {
-        //CASE: user is an agent
-        //Check is added user is exist?
-        const add_user_result = await DB.query(
-          "SELECT * FROM users WHERE username=$1;",
-          [req.body.username]
-        ).catch((err) => {
-          return res.status(500).send({
-            message: "error",
-            error: {
-              type: "database",
-              from: "add_user_result",
-              code: err.code,
-              detail: err.detail,
-              info: err,
-            },
-          });
-        });
-        //Check is added user is an admin account.
-        const admin_result = await DB.query(
-          "SELECT username FROM agents WHERE username=$1 UNION SELECT username FROM webmasters WHERE username=$2;",
-          [req.body.username, req.body.username]
-        ).catch((err) => {
-          return res.status(500).send({
-            message: "error",
-            error: {
-              type: "database",
-              from: "admin_result",
-              code: err.code,
-              detail: err.detail,
-              info: err,
-            },
-          });
-        });
-        if (add_user_result.rows[0] && !admin_result.rows[0]) {
-          //CASE: Added user exists and not an admin.
-          const add_user = add_user_result.rows[0].username;
-          const agent_id = agent_result.rows[0].agent_id;
-          //Check if added user already have an agent?
-          const is_have_agent_result = await DB.query(
-            "SELECT * FROM agent_customers WHERE username=$1;",
-            [add_user]
-          ).catch((err) => {
-            return res.status(500).send({
-              message: "error",
-              error: {
-                type: "database",
-                from: "is_have_agent_result",
-                code: err.code,
-                detail: err.detail,
-                info: err,
-              },
-            });
-          });
-          if (is_have_agent_result.rows[0]) {
+    //Check Authorization.
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      //CASE: User not found.
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    //Check is an agent
+    const agent = await UserTools.checkIsAgent(user.username);
+    if (agent) {
+      //CASE: user is an agent
+      //Check is added user is exist?
+      const add_user = await UserTools.validateUser(req.body.username);
+      //Check is added user is customer.
+      const customer = await UserTools.checkIsCustomer(add_user.username);
+      if (add_user) {
+        //CASE: Add User found.
+        if (!customer) {
+          //CASE: User is not a customer.
+          throw new CustomError.BadRequest("This account cannot be added.");
+        } else {
+          //CASE: Added user exists and not an staff.
+          if (customer.agent) {
             //CASE: Already has an agent.
-            return res.status(400).send({
-              message: "error",
-              error: "Customer already has an agent.",
-            });
+            throw new CustomError.BadRequest("Customer already has an agent.");
           } else {
             //CASE: No agent assigned.
-            await DB.query(
-              "INSERT INTO agent_customers (username, agent_id) VALUES ($1, $2);",
-              [add_user, agent_id]
-            )
-              .then((insert_agent_customers_result) => {
+            //Update agent of customer.
+            await DB.query("UPDATE customers SET agent=$1 WHERE username=$2;", [
+              agent.agent_id,
+              add_user.username,
+            ])
+              .then((update_customer_result) => {
                 return res.status(201).send({ message: "success" });
               })
               .catch((err) => {
-                return res.status(500).send({
-                  message: "error",
-                  error: {
-                    type: "database",
-                    from: "insert_agent_customers_result",
-                    code: err.code,
-                    detail: err.detail,
-                    info: err,
-                  },
-                });
+                throw new CustomError.DBError(err, "update_customer_result");
               });
-          }
-        } else {
-          if (!add_user_result.rows[0]) {
-            //CASE: Added user not exists.
-            return res.status(400).send({
-              message: "error",
-              error: "Username does not exist.",
-            });
-          }
-          if (admin_result.rows[0]) {
-            //CASE: Added user is an admin.
-            return res.status(400).send({
-              message: "error",
-              error: "This account cannot be added.",
-            });
           }
         }
       } else {
-        //CASE: User is not an agent.
-        return res
-          .status(401)
-          .send({ message: "error", error: "Unauthorized" });
+        //CASE: Add User not found.
+        throw new CustomError.BadRequest("User not found.");
       }
+    } else {
+      //CASE: User is not an agent.
+      throw new CustomError.Unauthorized();
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      //CASE: No Token.
-      return res.status(401).send({ message: "error", error: "Unauthorized" });
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
     }
-    //CASE: Server error
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: {
-        type: "server",
-        stack: err.stack,
-      },
-    });
   }
 });
-// [GET] : Get customer's properties.
+// [GET] : /properties/:customer
 router.get("/properties/:customer", async (req, res) => {
+  /*
+      DO: Get a list of properties' history of customer.
+      ERROR:  1. Bad Request
+              2. Unauthorized
+              3. DBError
+  */
   try {
     //Check required information.
     if (!req.params.customer) {
-      return res.status(400).send({
-        message: "success",
-        error: "Bad request.",
-      });
+      throw new CustomError.BadRequest();
     }
     const customer = req.params.customer;
-    //Get Token.
-    const cookie = req.cookies["jwt"];
-    //Verify Token.
-    const claim = jwt.verify(cookie, process.env.SECRET);
-    //Check is token invalid?
-    if (!claim) {
-      //CASE: Token is invalid.
-      return res.status(401).send({
-        message: "error",
-        error: "Unauthorized",
-      });
-    } else {
-      //CASE: Token is valid.
-      //Check user exists?
-      const user_result = await DB.query(
-        "SELECT * FROM users WHERE username=$1; ",
-        [claim.username]
+    //Check Authorization.
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    const agent = await UserTools.checkIsAgent(user.username);
+    if (agent) {
+      //CASE: User is an agent.
+      //Check if customer has the user as their agent?
+      const customers_result = await DB.query(
+        "SELECT customer_id FROM customers WHERE agent=$1 AND username=$2;",
+        [agent.agent_id, customer]
       ).catch((err) => {
-        return res.status(500).send({
-          message: "error",
-          error: {
-            type: "database",
-            from: "user_result",
-            code: err.code,
-            detail: err.detail,
-            info: err,
-          },
-        });
+        throw new CustomError.DBError(err, "customers_result");
       });
-      if (!user_result.rows[0]) {
-        //CASE: User not exists.
-        res.cookie("jwt", "", { maxAge: 0 });
-        return res.status(401).status({
-          message: "error",
-          error: "Unauthorized",
-        });
+      if (customers_result.rows[0]) {
+        //CASE: User is customer's agent.
+        //Get properties' history of customer.
+        const customer_id = customers_result.rows[0].customer_id;
+        await DB.query(
+          "SELECT property_id, property_name, status, is_favorite, timestamp FROM history INNER JOIN properties USING(property_id) WHERE customer_id=$1 ORDER BY timestamp DESC;",
+          [customer_id]
+        )
+          .then((properties_result) => {
+            return res.status(200).send({
+              message: "success",
+              payload: properties_result.rows,
+            });
+          })
+          .catch((err) => {
+            throw new CustomError.DBError(err, "properties_result");
+          });
       } else {
-        const user = user_result.rows[0];
-        //Check user is an agent?
-        const agent_result = await DB.query(
-          "SELECT * FROM agents WHERE username=$1;",
-          [user.username]
-        ).catch((err) => {
-          return res.status(500).send({
-            message: "error",
-            error: {
-              type: "database",
-              from: "agent_result",
-              code: err.code,
-              detail: err.detail,
-              info: err,
-            },
-          });
-        });
-        const agent = agent_result.rows[0];
-        if (agent) {
-          //CASE: User is an agent.
-          //Check if customer has the user as their agent?
-          const agent_customers_result = await DB.query(
-            "SELECT * FROM agent_customers WHERE agent_id=$1 AND username=$2;",
-            [agent.agent_id, customer]
-          ).catch((err) => {
-            return res.status(500).send({
-              message: "error",
-              error: {
-                type: "database",
-                from: "agent_customers_result",
-                code: err.code,
-                detail: err.detail,
-                info: err,
-              },
-            });
-          });
-          if (agent_customers_result.rows[0]) {
-            //CASE: User is customer's agent.
-            await DB.query(
-              "SELECT property_id, property_name, status, is_favorite, timestamp FROM history INNER JOIN properties USING(property_id) WHERE username=$1 ORDER BY timestamp DESC;",
-              [customer]
-            )
-              .then((properties_result) => {
-                return res.status(200).send({
-                  message: "success",
-                  payload: properties_result.rows,
-                });
-              })
-              .catch((err) => {
-                return res.status(500).send({
-                  message: "error",
-                  error: {
-                    type: "database",
-                    from: "properties_result",
-                    code: err.code,
-                    detail: err.detail,
-                    info: err,
-                  },
-                });
-              });
-          } else {
-            //CASE: User is not customer's agent.
-            res.status(400).send({
-              message: "error",
-              error: "You are not an agent of this customer.",
-            });
-          }
-        }
+        //CASE: Not agent of this customer.
+        throw new CustomError.BadRequest(
+          "You are not the agent of this customer."
+        );
       }
+    } else {
+      //CASE: User is not an agent.
+      throw new CustomError.Unauthorized();
     }
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      //CASE: No token.
-      return res.status(401).send({
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
         message: "error",
-        error: "Unauthorized",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
       });
     }
-    //CASE: Server error.
-    console.error(err);
-    res.status(500).send({
-      message: "error",
-      error: {
-        type: "server",
-        stack: err.stack,
-      },
-    });
   }
 });
 
