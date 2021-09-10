@@ -12,7 +12,7 @@ router.get("/approve", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     const webmaster = await UserTools.checkIsWebmaster(user.username);
@@ -63,7 +63,7 @@ router.patch("/approve", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     const webmaster = await UserTools.checkIsWebmaster(user.username);
@@ -108,7 +108,7 @@ router.get("/agents/", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     const webmaster = await UserTools.checkIsWebmaster(user.username);
@@ -156,7 +156,7 @@ router.post("/agents/add", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     const webmaster = await UserTools.checkIsWebmaster(user.username);
@@ -208,7 +208,7 @@ router.delete("/agents/remove/:username", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     const webmaster = await UserTools.checkIsWebmaster(user.username);
@@ -260,7 +260,7 @@ router.get("/customers/:agent_id", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     const webmaster = await UserTools.checkIsWebmaster(user.username);
@@ -311,7 +311,7 @@ router.post("/customers/add", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     const webmaster = await UserTools.checkIsWebmaster(user.username);
@@ -378,7 +378,7 @@ router.delete("/customers/remove/:username", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     const webmaster = await UserTools.checkIsWebmaster(user.username);

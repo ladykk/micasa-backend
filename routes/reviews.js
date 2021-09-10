@@ -43,7 +43,7 @@ router.get("/pending", async (req, res) => {
     //Check Authorization.
     const user = UserTools.validateToken(req);
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     //Check is customer.
@@ -97,7 +97,7 @@ router.post("/pending", async (req, res) => {
     //Check Authorization.
     const user = await UserTools.validateToken(req);
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     //Check is customer.
@@ -153,7 +153,7 @@ router.get("/history", async (req, res) => {
     //Check Authorization.
     const user = UserTools.validateToken(req);
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     //Check is customer.

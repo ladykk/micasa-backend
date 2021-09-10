@@ -19,7 +19,7 @@ router.get("/favorite_properties/", async (req, res) => {
     //Check is token valid and found user.
     if (!user) {
       //CASE: User not found.
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     //Check is user a customer.
@@ -83,7 +83,7 @@ router.get("/favorite_property/:property_id", async (req, res) => {
     //Check is token valid and found user.
     if (!user) {
       //CASE: User not found.
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     const customer = await UserTools.checkIsCustomer(user.username);
@@ -142,7 +142,7 @@ router.post("/favorite_property/:property_id", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new Unauthorized();
     }
     const customer = await UserTools.checkIsCustomer(user.username);
@@ -230,7 +230,7 @@ router.get("/agent/", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new Unauthorized();
     }
     const customer = await UserTools.checkIsCustomer(user.username);

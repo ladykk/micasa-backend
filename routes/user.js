@@ -132,6 +132,8 @@ router.post("/login", async (req, res) => {
         res.cookie("jwt", token, {
           httpOnly: true,
           maxAge: 30 * 24 * 60 * 60 * 1000, //1 Month
+          
+          secure: false
         });
         res.status(201).send({ message: "success" });
       }
@@ -158,7 +160,7 @@ router.get("/user", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     }
     //Separate password with other information.
@@ -246,7 +248,7 @@ router.get("/user", async (req, res) => {
 });
 // [POST] : Logout.
 router.post("/logout", async (req, res) => {
-  res.cookie("jwt", "", { maxAge: 0 });
+  res.cookie("jwt", "", { maxAge: 0,  secure: false });
   res.status(200).send({ message: "success" });
 });
 // [PATCH] : Update.
@@ -265,7 +267,7 @@ router.patch("/update", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     } else {
       //CASE: User is found.
@@ -356,7 +358,7 @@ router.delete("/remove_avatar", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0 });
+      res.cookie("jwt", "", { maxAge: 0,  secure: false });
       throw new CustomError.Unauthorized();
     } else {
       //CASE: User exist.
