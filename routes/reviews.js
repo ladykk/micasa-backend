@@ -102,8 +102,6 @@ router.post("/pending", async (req, res) => {
     }
     //Check is customer.
     const customer = await UserTools.checkIsCustomer(user.username);
-    console.log(customer);
-    console.log(user);
     if (customer) {
       //CASE: Found customer
       //Update review

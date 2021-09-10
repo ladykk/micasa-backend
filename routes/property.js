@@ -4,6 +4,7 @@ const DB = require("../db");
 const Property = require("../models/property");
 const UserTools = require("../tools/UserTools");
 const CustomError = require("../tools/CustomError");
+const { JsonWebTokenError } = require("jsonwebtoken");
 
 // [POST] : Add property.
 router.post("/add", async (req, res) => {
@@ -469,62 +470,74 @@ router.get("/id/:property_id", async (req, res) => {
         //CASE: Property is exist.
         //Set property
         property = Property.property(property_result.rows[0]);
-        //Check is property in history
-        const history_result = await DB.query(
-          "SELECT * FROM history WHERE customer_id=$1 AND property_id=$2;",
-          [customer.customer_id, property_id]
+        is_query_property = true;
+        //Check is owner
+        const owner_result = await DB.query(
+          "SELECT * FROM owners WHERE property_id=$1",
+          [property_id]
         ).catch((err) => {
-          throw new CustomError.DBError(err, "history_result");
+          throw new CustomError.DBError(err, "property_result");
         });
-        if (history_result.rows[0]) {
-          //CASE: Property is in history.
-          //Update Timestamp.
-          await DB.query(
-            "UPDATE history SET timestamp=CURRENT_TIMESTAMP WHERE customer_id=$1 AND property_id=$2;",
+        if (owner_result.rows[0].customer_id !== customer.customer_id) {
+          //CASE: User is not an owner.
+          //Check is property in history
+          const history_result = await DB.query(
+            "SELECT * FROM history WHERE customer_id=$1 AND property_id=$2;",
             [customer.customer_id, property_id]
           ).catch((err) => {
-            throw new CustomError.DBError(err, "update_history_result");
+            throw new CustomError.DBError(err, "history_result");
           });
-        } else {
-          //CASE: Property is not in history.
-          await DB.query(
-            "INSERT INTO history (property_id, customer_id) VALUES ($1, $2);",
-            [property_id, customer.customer_id]
-          )
-            .then(async (insert_history_result) => {
-              await DB.query(
-                "UPDATE properties SET seen=(SELECT seen + 1 FROM properties WHERE property_id=$1) WHERE property_id=$1;",
-                [property_id]
-              ).catch((err) => {
-                throw new CustomError.DBError(err, "update_seen_result");
-              });
-            })
-            .catch((err) => {
-              throw new CustomError.DBError(err, "insert_history_result");
+          if (history_result.rows[0]) {
+            //CASE: Property is in history.
+            //Update Timestamp.
+            await DB.query(
+              "UPDATE history SET timestamp=CURRENT_TIMESTAMP WHERE customer_id=$1 AND property_id=$2;",
+              [customer.customer_id, property_id]
+            ).catch((err) => {
+              throw new CustomError.DBError(err, "update_history_result");
             });
+          } else {
+            //CASE: Property is not in history.
+            await DB.query(
+              "INSERT INTO history (property_id, customer_id) VALUES ($1, $2);",
+              [property_id, customer.customer_id]
+            )
+              .then(async (insert_history_result) => {
+                await DB.query(
+                  "UPDATE properties SET seen=(SELECT seen + 1 FROM properties WHERE property_id=$1) WHERE property_id=$1;",
+                  [property_id]
+                ).catch((err) => {
+                  throw new CustomError.DBError(err, "update_seen_result");
+                });
+              })
+              .catch((err) => {
+                throw new CustomError.DBError(err, "insert_history_result");
+              });
+          }
         }
-        is_query_property = true;
       } else {
         throw new CustomError.NotFound("Property not found.");
       }
     }
   } catch (err) {
-    const { status, error } = CustomError.handleResponse(err);
-    if (status) {
-      res.status(status).send({
-        message: "error",
-        error,
-      });
-    } else {
-      res.status(500).send({
-        message: "error",
-        error: {
-          type: "server",
-          stack: err.stack,
-        },
-      });
+    if (!(err instanceof JsonWebTokenError)) {
+      const { status, error } = CustomError.handleResponse(err);
+      if (status) {
+        res.status(status).send({
+          message: "error",
+          error,
+        });
+      } else {
+        res.status(500).send({
+          message: "error",
+          error: {
+            type: "server",
+            stack: err.stack,
+          },
+        });
+      }
+      is_response_sent = true;
     }
-    is_response_sent = true;
   } finally {
     //Check is response not sent.
     if (!is_response_sent) {
@@ -797,6 +810,81 @@ router.get("/owned/", async (req, res) => {
           stack: err.stack,
         },
       });
+    }
+  }
+});
+// [GET] : Get is user can favorite properties.
+router.get("/favorite/:property_id", async (req, res) => {
+  try {
+    //Check required information.
+    if (!req.params.property_id) {
+      throw new CustomError.BadRequest();
+    }
+    const property_id = Number.parseInt(req.params.property_id, 10);
+    //Check Authorization.
+    const user = await UserTools.validateToken(req);
+    //Check is token valid and found user.
+    if (!user) {
+      res.cookie("jwt", "", { maxAge: 0 });
+      throw new CustomError.Unauthorized();
+    }
+    //Check is customer.
+    const customer = await UserTools.checkIsCustomer(user.username);
+    if (customer) {
+      //CASE: User is a customer.
+      //Check is user a owner.
+      const owner_result = await DB.query(
+        "SELECT * FROM owners WHERE property_id=$1 AND customer_id=$2;",
+        [property_id, customer.customer_id]
+      ).catch((err) => {
+        throw new CustomError.DBError(err);
+      });
+      if (owner_result.rows[0]) {
+        //CASE: User is an owner.
+
+        return res.status(200).send({
+          message: "success",
+          payload: false,
+        });
+      } else {
+        //CASE: User is not an owner.
+        return res.status(200).send({
+          message: "success",
+          payload: true,
+        });
+      }
+    } else {
+      //CASE: User is not a customer.
+      return res.status(200).send({
+        message: "success",
+        payload: false,
+      });
+    }
+  } catch (err) {
+    if (
+      err instanceof JsonWebTokenError ||
+      err instanceof CustomError.Unauthorized
+    ) {
+      return res.status(200).send({
+        message: "success",
+        payload: false,
+      });
+    } else {
+      const { status, error } = CustomError.handleResponse(err);
+      if (status) {
+        res.status(status).send({
+          message: "error",
+          error,
+        });
+      } else {
+        res.status(500).send({
+          message: "error",
+          error: {
+            type: "server",
+            stack: err.stack,
+          },
+        });
+      }
     }
   }
 });
