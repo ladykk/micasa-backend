@@ -18,7 +18,7 @@ app.use(express.json());
 app.use(
   cors({
     credentials: true,
-    origin: ["http://localhosy:3000"],
+    origin: ["http://localhost:3000", "http://ladyk.ddns.net"],
   })
 );
 app.use(cookie_parser());
@@ -32,6 +32,10 @@ app.use("/api/webmaster", webmasterRoute);
 app.use("/api/customer", customerRoute);
 app.use("/api/agent", agentRoute);
 app.use("/api/reviews", reviewsRoute);
+
+app.get("/", (req, res) => {
+  res.send("MI CASA - Backend.");
+});
 
 app.listen(5000, () =>
   console.log(`Mi Casa Backend: Server started. (${new Date().toUTCString()})`)
