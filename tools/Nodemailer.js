@@ -3,7 +3,10 @@ const fs = require("fs");
 const hoganJS = require("hogan.js");
 
 //get file
-const template = fs.readFileSync("./views/forgetPassword.hjs", "utf-8");
+const template = fs.readFileSync(
+  "./views/forget_password_template.hjs",
+  "utf-8"
+);
 //compile template
 const compliedTemplate = hoganJS.compile(template);
 
@@ -34,7 +37,10 @@ const sendRecoveryEmail = (user, token) => {
   transporter.sendMail(
     forgetPasswordMailOptions(user, token),
     function (err, info) {
-      if (err) console.log(err);
+      if (err) {
+        console.log(`Cannot send recover email: (User: ${user.username})`);
+        console.log(err);
+      }
     }
   );
 };

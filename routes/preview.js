@@ -3,7 +3,10 @@ const hoganJS = require("hogan.js");
 const fs = require("fs");
 
 //get file
-const template = fs.readFileSync("./views/forgetPassword.hjs", "utf-8");
+const template = fs.readFileSync(
+  "./views/forget_password_template.hjs",
+  "utf-8"
+);
 //compile template
 const compliedTemplate = hoganJS.compile(template);
 
