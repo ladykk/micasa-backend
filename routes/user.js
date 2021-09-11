@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 const CustomError = require("../tools/CustomError");
 const UserTools = require("../tools/UserTools");
+const Nodemailer = require("../tools/Nodemailer");
 
 //User's Function
 
@@ -132,8 +133,8 @@ router.post("/login", async (req, res) => {
         res.cookie("jwt", token, {
           httpOnly: true,
           maxAge: 30 * 24 * 60 * 60 * 1000, //1 Month
-          
-          secure: false
+
+          secure: false,
         });
         res.status(201).send({ message: "success" });
       }
@@ -160,7 +161,7 @@ router.get("/user", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     //Separate password with other information.
@@ -248,7 +249,7 @@ router.get("/user", async (req, res) => {
 });
 // [POST] : Logout.
 router.post("/logout", async (req, res) => {
-  res.cookie("jwt", "", { maxAge: 0,  secure: false });
+  res.cookie("jwt", "", { maxAge: 0, secure: false });
   res.status(200).send({ message: "success" });
 });
 // [PATCH] : Update.
@@ -267,7 +268,7 @@ router.patch("/update", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     } else {
       //CASE: User is found.
@@ -358,7 +359,7 @@ router.delete("/remove_avatar", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     } else {
       //CASE: User exist.
@@ -372,6 +373,131 @@ router.delete("/remove_avatar", async (req, res) => {
         });
       }
       res.status(201).send({ message: "success" });
+    }
+  } catch (err) {
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
+    }
+  }
+});
+// [POST] : Get recovery email.
+router.post("/recover", async (req, res) => {
+  try {
+    //Check required information
+    if (!req.body.username || !req.body.email) {
+      throw new CustomError.BadRequest();
+    }
+    const username = req.body.username;
+    const email = req.body.email;
+    //Check User exist.
+    const user = await UserTools.validateUser(username);
+    if (user) {
+      //CASE: User found.
+      //Check is email match
+      if (user.email === email) {
+        //CASE: Email match.
+        //Send email
+        const token = jwt.sign(
+          { username: user.username, email: user.email },
+          process.env.SECRET,
+          { expiresIn: 3600000 }
+        );
+        Nodemailer.sendRecoveryEmail(user, token);
+      }
+    }
+    res.status(201).send({ message: "success" });
+  } catch (err) {
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
+    }
+  }
+});
+// [GET] : Check Recovery token.
+router.get("/recover/:token", async (req, res) => {
+  try {
+    //Check required information.
+    if (!req.params.token) {
+      throw new CustomError.BadRequest();
+    }
+    const token = req.params.token;
+    //Verify token.
+
+    const claim = jwt.verify(token, process.env.SECRET);
+    res.status(200).send({
+      message: "success",
+      payload: claim,
+    });
+  } catch (err) {
+    const { status, error } = CustomError.handleResponse(err);
+    if (status) {
+      res.status(status).send({
+        message: "error",
+        error,
+      });
+    } else {
+      res.status(500).send({
+        message: "error",
+        error: {
+          type: "server",
+          stack: err.stack,
+        },
+      });
+    }
+  }
+});
+
+router.patch("/recover/", async (req, res) => {
+  try {
+    //Check required information.
+    if (!req.body.token || !req.body.password) {
+      throw new CustomError.BadRequest();
+    }
+    const token = req.body.token;
+    const password = await bcrypt.hash(
+      req.body.password,
+      await bcrypt.genSalt()
+    );
+    //Verify token.
+    const claim = jwt.verify(token, process.env.SECRET);
+    //Check is valid
+    if (!claim) {
+      //CASE: Token not valid.
+      throw new CustomError.Unauthorized();
+    } else {
+      await DB.query("UPDATE users SET password=$1 WHERE username=$2;", [
+        password,
+        claim.username,
+      ])
+        .then((update_password_result) => {
+          return res.status(201).send({ message: "success" });
+        })
+        .catch((err) => {
+          throw new CustomError.DBError(err, "update_password_result");
+        });
     }
   } catch (err) {
     const { status, error } = CustomError.handleResponse(err);

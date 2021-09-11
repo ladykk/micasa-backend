@@ -12,13 +12,18 @@ const webmasterRoute = require("./routes/webmaster");
 const customerRoute = require("./routes/customer");
 const agentRoute = require("./routes/agent");
 const reviewsRoute = require("./routes/reviews");
+const previewRoute = require("./routes/preview");
 
 //Middleware
 app.use(express.json());
 app.use(
   cors({
     credentials: true,
-    origin: ["http://localhost:3000", "http://ladyk.ddns.net", "http://192.168.1.10:3000"],
+    origin: [
+      "http://localhost:3000",
+      "http://ladyk.ddns.net",
+      "http://192.168.1.10:3000",
+    ],
   })
 );
 app.use(cookie_parser());
@@ -32,6 +37,9 @@ app.use("/api/webmaster", webmasterRoute);
 app.use("/api/customer", customerRoute);
 app.use("/api/agent", agentRoute);
 app.use("/api/reviews", reviewsRoute);
+app.use("/preview", previewRoute);
+
+app.use(express.static(__dirname + "/public"));
 
 app.get("/", (req, res) => {
   res.send("MI CASA - Backend.");

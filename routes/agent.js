@@ -12,14 +12,14 @@ router.get("/customers/", async (req, res) => {
       ERROR:  1. Unauthorized.
               2. DBError.
   */
-             
+
   try {
     //Check Authorization.
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
       //CASE: User not found.
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     const agent = await UserTools.checkIsAgent(user.username);
@@ -81,7 +81,7 @@ router.post("/customers/add", async (req, res) => {
     //Check is token valid and found user.
     if (!user) {
       //CASE: User not found.
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     //Check is an agent
@@ -161,7 +161,7 @@ router.get("/properties/:customer", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     const agent = await UserTools.checkIsAgent(user.username);

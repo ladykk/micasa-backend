@@ -41,13 +41,13 @@ router.get("/", async (req, res) => {
 router.get("/pending", async (req, res) => {
   try {
     //Check Authorization.
-    const user = UserTools.validateToken(req);
+    const user = await UserTools.validateToken(req);
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     //Check is customer.
-    const customer = UserTools.checkIsCustomer(user.username);
+    const customer = await UserTools.checkIsCustomer(user.username);
     if (customer) {
       //CASE: Found customer
       await DB.query(
@@ -97,7 +97,7 @@ router.post("/pending", async (req, res) => {
     //Check Authorization.
     const user = await UserTools.validateToken(req);
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     //Check is customer.
@@ -151,13 +151,13 @@ router.post("/pending", async (req, res) => {
 router.get("/history", async (req, res) => {
   try {
     //Check Authorization.
-    const user = UserTools.validateToken(req);
+    const user = await UserTools.validateToken(req);
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     //Check is customer.
-    const customer = UserTools.checkIsCustomer(user.username);
+    const customer = await UserTools.checkIsCustomer(user.username);
     if (customer) {
       //CASE: Found customer
       await DB.query(

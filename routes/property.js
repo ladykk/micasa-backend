@@ -12,7 +12,7 @@ router.post("/add", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     const customer = await UserTools.checkIsCustomer(user.username);
@@ -168,7 +168,7 @@ router.get("/edit/:property_id", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     const customer = await UserTools.checkIsCustomer(user.username);
@@ -238,7 +238,7 @@ router.patch("/edit/:property_id", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     const customer = await UserTools.checkIsCustomer(user.username);
@@ -451,7 +451,7 @@ router.get("/id/:property_id", async (req, res) => {
     user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     const customer = await UserTools.checkIsCustomer(user.username);
@@ -767,7 +767,7 @@ router.get("/owned/", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     const customer = await UserTools.checkIsCustomer(user.username);
@@ -825,7 +825,7 @@ router.get("/favorite/:property_id", async (req, res) => {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     //Check is customer.
@@ -898,14 +898,14 @@ router.get("/contact/:property_id", async (req, res) => {
     }
     const property_id = req.params.property_id;
     //Check Authorization.
-    const user = UserTools.validateToken(req);
+    const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
     if (!user) {
-      res.cookie("jwt", "", { maxAge: 0,  secure: false });
+      res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new CustomError.Unauthorized();
     }
     //Check is user a staff.
-    const staff = UserTools.checkIsStaff(user.username);
+    const staff = await UserTools.checkIsStaff(user.username);
     if (staff) {
       //CASE: User is staff.
       const owner_result = await DB.query(

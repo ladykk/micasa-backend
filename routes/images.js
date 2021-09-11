@@ -1,6 +1,7 @@
 const DB = require("../db");
 const CustomError = require("../tools/CustomError");
 const router = require("express").Router();
+const fs = require("fs");
 
 // Images' functions
 // [GET] : Get avatar's image
