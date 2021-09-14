@@ -21,7 +21,7 @@ app.use(
     credentials: true,
     origin: [
       "http://localhost:3000",
-      "http://ladyk.ddns.net",
+      "http://ladyk.ddns.net:3000",
       "http://192.168.1.10:3000",
     ],
   })
