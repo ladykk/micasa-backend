@@ -1,4 +1,4 @@
-const jwt = require("jsonwebtoken");
+const { JsonWebTokenError } = require("jsonwebtoken");
 
 function Unauthorized(message = "Unauthorized") {
   this.name = "Unauthorized";
@@ -57,7 +57,7 @@ function DBError(err, from = "") {
 DBError.prototype = Error.prototype;
 
 function handleResponse(err) {
-  if (err instanceof jwt.JsonWebTokenError) {
+  if (err instanceof JsonWebTokenError) {
     return {
       status: 401,
       error: "Unauthorized.",

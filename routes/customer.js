@@ -3,6 +3,7 @@ const DB = require("../db");
 const Property = require("../models/property");
 const UserTools = require("../tools/UserTools");
 const CustomError = require("../tools/CustomError");
+const { JsonWebTokenError } = require("jsonwebtoken");
 
 // Customers' functions.
 
@@ -111,20 +112,27 @@ router.get("/favorite_property/:property_id", async (req, res) => {
       return res.status(200).send({ message: "success", payload: false });
     }
   } catch (err) {
-    const { status, error } = CustomError.handleResponse(err);
-    if (status) {
-      res.status(status).send({
-        message: "error",
-        error,
-      });
+    if (
+      err instanceof JsonWebTokenError ||
+      err instanceof CustomError.Unauthorized
+    ) {
+      return res.status(200).send({ message: "success", payload: false });
     } else {
-      res.status(500).send({
-        message: "error",
-        error: {
-          type: "server",
-          stack: err.stack,
-        },
-      });
+      const { status, error } = CustomError.handleResponse(err);
+      if (status) {
+        res.status(status).send({
+          message: "error",
+          error,
+        });
+      } else {
+        res.status(500).send({
+          message: "error",
+          error: {
+            type: "server",
+            stack: err.stack,
+          },
+        });
+      }
     }
   }
 });

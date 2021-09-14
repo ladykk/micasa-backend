@@ -59,6 +59,7 @@ const new_property = (body, files) => {
 const property = (query) => {
   try {
     const property = {
+      owner_id: query.owner_id,
       property_id: query.property_id,
       status: query.status,
       property_name: query.property_name,
