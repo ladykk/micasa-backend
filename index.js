@@ -13,6 +13,7 @@ const customerRoute = require("./routes/customer");
 const agentRoute = require("./routes/agent");
 const reviewsRoute = require("./routes/reviews");
 const previewRoute = require("./routes/preview");
+const dataRoute = require("./routes/data");
 
 //Middleware
 app.use(express.json());
@@ -38,6 +39,7 @@ app.use("/api/customer", customerRoute);
 app.use("/api/agent", agentRoute);
 app.use("/api/reviews", reviewsRoute);
 app.use("/preview", previewRoute);
+app.use("/api/data", dataRoute);
 
 app.use(express.static(__dirname + "/public"));
 
