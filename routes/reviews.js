@@ -51,7 +51,8 @@ router.get("/pending", async (req, res) => {
     if (customer) {
       //CASE: Found customer
       await DB.query(
-        "SELECT property_name, property_id, image_cover, role FROM reviews NATURAL JOIN properties WHERE message IS NULL AND rate IS NULL;"
+        "SELECT property_name, property_id, image_cover, role FROM reviews NATURAL JOIN properties WHERE message IS NULL AND rate IS NULL AND customer_id=$1;",
+        [customer.customer_id]
       )
         .then((reviews_result) => {
           return res.status(200).send({
@@ -161,7 +162,7 @@ router.get("/history", async (req, res) => {
     if (customer) {
       //CASE: Found customer
       await DB.query(
-        "SELECT property_name, property_id, image_cover, role, rate, message, timestamp FROM reviews NATURAL JOIN properties WHERE message IS NOT NULL AND rate IS NOT NULL;"
+        "SELECT property_name, property_id, image_cover, role, rate, message, timestamp FROM reviews NATURAL JOIN properties WHERE message IS NOT NULL AND rate IS NOT NULL AND customer_id=$1;", [customer.customer_id]
       )
         .then((reviews_result) => {
           return res.status(200).send({

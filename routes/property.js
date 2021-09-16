@@ -295,7 +295,7 @@ router.patch("/edit/:property_id", async (req, res) => {
             if (update_data.buyer) {
               //CASE: Has buyer
               //Check is buyer exist.
-              const buyer = await UserTools.checkIsCustomer(update_data.buyer);
+              const buyer = await UserTools.checkIsCustomer(update_data.buyer.toLowerCase());
               if (buyer) {
                 //CASE: Has buyer
                 //Insert into buyer
@@ -590,9 +590,14 @@ router.get("/id/:property_id", async (req, res) => {
               [property_id]
             )
               .then((property_images_result) => {
-                for (let i = 0; i < property_images_result.rows.length; i++) {
-                  images[`image_${i}`] =
+                for (let i = 0; i < 10; i++) {
+                  if(property_images_result.rows[i]) {
+                    images[`image_${i+1}`] =
                     property_images_result.rows[i].image_id;
+                  } else {
+                    images[`image_${i+1}`] = null;
+                  }
+                  
                 }
               })
               .catch((err) => {
@@ -956,7 +961,7 @@ router.get("/contact/:property_id", async (req, res) => {
     if (staff) {
       //CASE: User is staff.
       const owner_result = await DB.query(
-        "SELECT username, full_name, email, phone_number, avatar_id FROM users INNER JOIN customers USING(username) INNER JOIN properties ON customers.customer_id = properties.property_id WHERE property_id=$1;",
+        "SELECT username, full_name, email, phone_number, avatar_id FROM users INNER JOIN customers USING(username) INNER JOIN properties ON customers.customer_id = properties.owner_id WHERE property_id=$1;",
         [property_id]
       ).catch((err) => {
         throw new CustomError.DBError(err, "owner_result");
