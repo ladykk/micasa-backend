@@ -18,7 +18,7 @@ router.post("/register", async (req, res) => {
   try {
     //Model user and generate password.
     const new_user = await User.new_user(
-      req.body.username,
+      req.body.username.toLowerCase(),
       req.body.password,
       req.body.full_name,
       req.body.email,
@@ -105,7 +105,7 @@ router.post("/login", async (req, res) => {
     if (!req.body.username || !req.body.password) {
       throw new CustomError.BadRequest();
     }
-    const username = req.body.username;
+    const username = req.body.username.toLowerCase();
     const password = req.body.password;
     //Check is user exist
     const user_result = await DB.query(
@@ -418,7 +418,7 @@ router.post("/recover", async (req, res) => {
     if (!req.body.username || !req.body.email) {
       throw new CustomError.BadRequest();
     }
-    const username = req.body.username;
+    const username = req.body.username.toLowerCase();
     const email = req.body.email;
     //Check User exist.
     const user = await UserTools.validateUser(username);

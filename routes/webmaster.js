@@ -174,7 +174,7 @@ router.post("/agents/add", async (req, res) => {
     const webmaster = await UserTools.checkIsWebmaster(user.username);
     if (webmaster) {
       //Check is added username is exist
-      const add_user = await UserTools.validateUser(req.body.username).catch(
+      const add_user = await UserTools.validateUser(req.body.username.toLowerCase()).catch(
         (err) => {}
       );
       if (add_user) {
@@ -339,7 +339,7 @@ router.post("/customers/add", async (req, res) => {
 
     if (webmaster) {
       //Check is added username is exist
-      const add_user = await UserTools.validateUser(req.body.username);
+      const add_user = await UserTools.validateUser(req.body.username.toLowerCase());
       if (add_user) {
         //Check is user is staff account.
         const agent = await UserTools.checkIsAgent(req.body.agent_username);

@@ -83,7 +83,7 @@ router.post("/customers/add", async (req, res) => {
     if (agent) {
       //CASE: user is an agent
       //Check is added user is exist?
-      const add_user = await UserTools.validateUser(req.body.username);
+      const add_user = await UserTools.validateUser(req.body.username.toLowerCase());
       //Check is added user is customer.
       const customer = await UserTools.checkIsCustomer(add_user.username);
       if (add_user) {

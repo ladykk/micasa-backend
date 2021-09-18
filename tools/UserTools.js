@@ -6,7 +6,7 @@ const validateUser = async (username) => {
   //Check if user exists?
   const user_result = await DB.query(
     "SELECT * FROM users WHERE username=$1; ",
-    [username]
+    [username.toLowerCase()]
   ).catch((err) => {
     throw new CustomError.DBError(err, "user_result");
   });
