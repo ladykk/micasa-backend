@@ -9,8 +9,6 @@ const CustomError = require("../tools/CustomError");
 router.get("/customers/", async (req, res) => {
   /*
       DO: Return a list of customers of the agent.
-      ERROR:  1. Unauthorized.
-              2. DBError.
   */
 
   try {
@@ -25,9 +23,7 @@ router.get("/customers/", async (req, res) => {
     const agent = await UserTools.checkIsAgent(user.username);
     if (agent) {
       //CASE: User is an agent.
-      /*
-          Retrieve: customer_id, username, full_name, email, phone_number, gender, birthday, avatar_id;
-      */
+      //Query agent's customer.
       await DB.query(
         "SELECT customer_id, users.username AS username, full_name, email, phone_number, gender, birthday, avatar_id FROM users INNER JOIN customers USING(username) WHERE agent = $1;",
         [agent.agent_id]
@@ -67,8 +63,6 @@ router.get("/customers/", async (req, res) => {
 router.post("/customers/add", async (req, res) => {
   /*
       DO: Update customer's agent to be the agent.
-      ERROR:  1. Bad Request
-              2. Unauthorized
   */
   try {
     //Check required information
@@ -147,9 +141,6 @@ router.post("/customers/add", async (req, res) => {
 router.get("/properties/:customer", async (req, res) => {
   /*
       DO: Get a list of properties' history of customer.
-      ERROR:  1. Bad Request
-              2. Unauthorized
-              3. DBError
   */
   try {
     //Check required information.

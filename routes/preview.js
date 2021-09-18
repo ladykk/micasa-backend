@@ -10,7 +10,11 @@ const template = fs.readFileSync(
 //compile template
 const compliedTemplate = hoganJS.compile(template);
 
+// [GET] : /forgetpassword
 router.get("/forgetpassword", async (req, res) => {
+  /*
+      DO: Preview template of forget password recover email.
+  */
   res.send(
     compliedTemplate.render({
       full_name: "Full Customer Name",

@@ -2,9 +2,13 @@ const router = require("express").Router();
 const DB = require("../db");
 const CustomError = require("../tools/CustomError");
 
-// [GET] - Get district.
+// [GET] - /district
 router.get("/district", async (req, res) => {
+  /*
+      DO: Get district enum.
+  */
   try {
+    //Query district enum.
     await DB.query("SELECT unnest(enum_range(NULL::district));")
       .then((district) => {
         return res.status(200).send({
@@ -34,9 +38,13 @@ router.get("/district", async (req, res) => {
   }
 });
 
-// [GET] - Get province.
+// [GET] - /province
 router.get("/province", async (req, res) => {
+  /*
+      DO: Get province enum.
+  */
   try {
+    //Query province enum.
     await DB.query("SELECT unnest(enum_range(NULL::province));")
       .then((province) => {
         return res.status(200).send({
@@ -66,9 +74,13 @@ router.get("/province", async (req, res) => {
   }
 });
 
-// [GET] - Get bathroom.
+// [GET] - /bathroom
 router.get("/bathroom", async (req, res) => {
+  /*
+      DO: Get bathroom enum.
+  */
   try {
+    //Query bathroom enum.
     await DB.query("SELECT unnest(enum_range(NULL::property_bathroom));")
       .then((bathroom) => {
         return res.status(200).send({
@@ -98,9 +110,13 @@ router.get("/bathroom", async (req, res) => {
   }
 });
 
-// [GET] - Get bedroom.
+// [GET] - /bedroom
 router.get("/bedroom", async (req, res) => {
+  /*
+      DO: Get bedroom enum.
+  */
   try {
+    //Query bedroom enum.
     await DB.query("SELECT unnest(enum_range(NULL::property_bedroom));")
       .then((bedroom) => {
         return res.status(200).send({
@@ -130,9 +146,13 @@ router.get("/bedroom", async (req, res) => {
   }
 });
 
-// [GET] - Get contract.
+// [GET] - /contract
 router.get("/contract", async (req, res) => {
+  /*
+      DO: Get contract enum.
+  */
   try {
+    //Query contract enum;
     await DB.query("SELECT unnest(enum_range(NULL::property_contract));")
       .then((contract) => {
         return res.status(200).send({
@@ -162,9 +182,13 @@ router.get("/contract", async (req, res) => {
   }
 });
 
-// [GET] - Get furnishing.
+// [GET] - /furnishing
 router.get("/furnishing", async (req, res) => {
+  /*
+      DO: Get furnishing enum.
+  */
   try {
+    //Query furnishing enum.
     await DB.query("SELECT unnest(enum_range(NULL::property_furnishing));")
       .then((furnishing) => {
         return res.status(200).send({
@@ -194,9 +218,13 @@ router.get("/furnishing", async (req, res) => {
   }
 });
 
-// [GET] - Get near_station.
+// [GET] - /near_station
 router.get("/near_station", async (req, res) => {
+  /*
+      DO: Get near_station enum.
+  */
   try {
+    //Query near_station enum.
     await DB.query("SELECT unnest(enum_range(NULL::property_near_station));")
       .then((near_station) => {
         return res.status(200).send({
@@ -226,9 +254,13 @@ router.get("/near_station", async (req, res) => {
   }
 });
 
-// [GET] - Get ownership.
+// [GET] - /ownership
 router.get("/ownership", async (req, res) => {
+  /*
+      DO: Get ownership enum.
+  */
   try {
+    //Query ownership enum.
     await DB.query("SELECT unnest(enum_range(NULL::property_ownership));")
       .then((ownership) => {
         return res.status(200).send({
@@ -258,9 +290,13 @@ router.get("/ownership", async (req, res) => {
   }
 });
 
-// [GET] - Get rent_payment.
+// [GET] - /rent_payment
 router.get("/rent_payment", async (req, res) => {
+  /*
+      DO: Get rent_payment enum.
+  */
   try {
+    //Query rent_payment enum.
     await DB.query("SELECT unnest(enum_range(NULL::property_rent_payment));")
       .then((rent_payment) => {
         return res.status(200).send({
@@ -290,9 +326,13 @@ router.get("/rent_payment", async (req, res) => {
   }
 });
 
-// [GET] - Get status.
+// [GET] - /status
 router.get("/status", async (req, res) => {
+  /*
+      DO: Get status enum.
+  */
   try {
+    //Query status enum.
     await DB.query("SELECT unnest(enum_range(NULL::property_status));")
       .then((status) => {
         return res.status(200).send({
@@ -322,9 +362,13 @@ router.get("/status", async (req, res) => {
   }
 });
 
-// [GET] - Get type.
+// [GET] - /type
 router.get("/type", async (req, res) => {
+  /*
+      DO: Get type enum.
+  */
   try {
+    //Query type enum.
     await DB.query("SELECT unnest(enum_range(NULL::property_type));")
       .then((type) => {
         return res.status(200).send({

@@ -11,8 +11,6 @@ const { JsonWebTokenError } = require("jsonwebtoken");
 router.get("/favorite_properties/", async (req, res) => {
   /*
       DO: Get a list of favorite properties of customer.
-      ERROR:  1. Unauthorized.
-              2. DBError.
   */
   try {
     //Check Authorization.
@@ -69,9 +67,6 @@ router.get("/favorite_properties/", async (req, res) => {
 router.get("/favorite_property/:property_id", async (req, res) => {
   /*
       DO: Get is customer favorite this property.
-      ERROR:  1. Unauthorized.
-              2. Bad Request.
-              3. DBError.
   */
   try {
     //Check required information.
@@ -136,8 +131,11 @@ router.get("/favorite_property/:property_id", async (req, res) => {
     }
   }
 });
-// [POST] : Set customer's favorite on property.
+// [POST] : /favorite_property/:property_id
 router.post("/favorite_property/:property_id", async (req, res) => {
+  /* 
+      DO: Set customer's favorite on property.
+  */
   try {
     //Check required information.
     if (!req.params.property_id && req.body.is_favorite) {
@@ -173,6 +171,7 @@ router.post("/favorite_property/:property_id", async (req, res) => {
         });
         if (history_result.rows[0]) {
           //CASE: Property is in history.
+          //Update history favorite on the property.
           await DB.query(
             "UPDATE history SET is_favorite=$1, timestamp=CURRENT_TIMESTAMP WHERE customer_id=$2 AND property_id=$3;",
             [is_favorite, customer.customer_id, property_id]
@@ -188,6 +187,7 @@ router.post("/favorite_property/:property_id", async (req, res) => {
             });
         } else {
           //CASE: Property is not in history.
+          //Add history and favorite on the property.
           await DB.query(
             "INSERT INTO history (property_id, customer_id, is_favorite) VALUES ($1, $2, $3);",
             [property_id, customer.customer_id, is_favorite]
@@ -231,8 +231,11 @@ router.post("/favorite_property/:property_id", async (req, res) => {
     }
   }
 });
-// [GET] : Get agent's detail.
+// [GET] : /agent/
 router.get("/agent/", async (req, res) => {
+  /*
+      DO: Get agent's detail.
+  */
   try {
     //Check Authorization.
     const user = await UserTools.validateToken(req);
@@ -241,9 +244,10 @@ router.get("/agent/", async (req, res) => {
       res.cookie("jwt", "", { maxAge: 0, secure: false });
       throw new Unauthorized();
     }
+    //Check is user is a customer.
     const customer = await UserTools.checkIsCustomer(user.username);
     if (customer) {
-      //CASE: User found.
+      //CASE: User found && a customer.
       //Check is has agent.
       if (customer.agent) {
         //CASE: Has Agent.
@@ -263,6 +267,7 @@ router.get("/agent/", async (req, res) => {
           });
       } else {
         //CASE: No Agent.
+        //Return null.
         return res.status(200).send({
           message: "success",
           payload: null,

@@ -4,14 +4,18 @@ const router = require("express").Router();
 const fs = require("fs");
 
 // Images' functions
-// [GET] : Get avatar's image
+// [GET] : /avatar/:avatar_id
 router.get("/avatar/:avatar_id", async (req, res) => {
+  /*
+      DO: Get avatar's image by id
+  */
   try {
+    //Check require information.
     if (!req.params.avatar_id) {
       throw new CustomError.BadRequest();
     }
     const avatar_id = req.params.avatar_id;
-    //Get Data
+    //Query avatar.
     await DB.query("SELECT * FROM avatars WHERE avatar_id=$1", [avatar_id])
       .then((avatar_result) => {
         const avatar = avatar_result.rows[0].data;
@@ -42,13 +46,18 @@ router.get("/avatar/:avatar_id", async (req, res) => {
     }
   }
 });
-// [GET] : Get images
+// [GET] : /:image_id
 router.get("/:image_id", async (req, res) => {
+  /*
+      DO: Get image by id.
+  */
   try {
+    //Check require information.
     if (!req.params.image_id) {
       throw new CustomError.BadRequest();
     }
     const image_id = req.params.image_id;
+    //Query image
     await DB.query("SELECT * FROM images WHERE image_id=$1;", [image_id])
       .then((image_result) => {
         const image = image_result.rows[0].data;

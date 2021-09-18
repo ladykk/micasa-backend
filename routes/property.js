@@ -6,8 +6,11 @@ const UserTools = require("../tools/UserTools");
 const CustomError = require("../tools/CustomError");
 const { JsonWebTokenError } = require("jsonwebtoken");
 
-// [POST] : Add property.
+// [POST] : /add
 router.post("/add", async (req, res) => {
+  /*
+      DO: Add property to database.
+  */
   try {
     const user = await UserTools.validateToken(req);
     //Check is token valid and found user.
@@ -31,7 +34,7 @@ router.post("/add", async (req, res) => {
         //CASE: Model correct.
         //Add image_cover.
         const { data, name } = new_property.images["image_cover"];
-        //Insert image
+        //Insert image_cover
         const insert_image_cover_result = await DB.query(
           "INSERT INTO images (file_name, data) VALUES ($1, $2) RETURNING image_id;",
           [name, data]
@@ -149,8 +152,11 @@ router.post("/add", async (req, res) => {
     }
   }
 });
-// [GET] : Get property for edit.
+// [GET] : /edit/:property_id
 router.get("/edit/:property_id", async (req, res) => {
+  /*
+      DO: Get property's details for edit.
+  */
   try {
     //Check required information.
     if (!req.params.property_id) {
@@ -229,8 +235,11 @@ router.get("/edit/:property_id", async (req, res) => {
     }
   }
 });
-// [PATCH] : Update property.
+// [PATCH] : /edit/:property_id
 router.patch("/edit/:property_id", async (req, res) => {
+  /*
+      DO: Edit property.
+  */
   try {
     //Check require information.
     if (!req.params.property_id) {
@@ -446,8 +455,11 @@ router.patch("/edit/:property_id", async (req, res) => {
     }
   }
 });
-// [GET] : Get property by id.
+// [GET] : /id/:property_id
 router.get("/id/:property_id", async (req, res) => {
+  /*
+      DO: Get property's detail by ID.
+  */
   let property = null;
   let property_id = null;
   let user;
@@ -656,8 +668,11 @@ router.get("/id/:property_id", async (req, res) => {
     }
   }
 });
-// [GET] : Get properties by query.
+// [GET] : /query
 router.get("/query", async (req, res) => {
+  /*
+      DO: Get property that listing following the requirement.
+  */
   try {
     let params = {
       furnishing: [],
@@ -808,8 +823,11 @@ router.get("/query", async (req, res) => {
     }
   }
 });
-// [GET] : Get own properties
+// [GET] : /owned/
 router.get("/owned/", async (req, res) => {
+  /*
+      DO: Get properties that owned by a user.
+  */
   try {
     //Check Authorization
     const user = await UserTools.validateToken(req);
@@ -861,8 +879,11 @@ router.get("/owned/", async (req, res) => {
     }
   }
 });
-// [GET] : Get is user can favorite properties.
+// [GET] : /favorite/:property_id
 router.get("/favorite/:property_id", async (req, res) => {
+  /*
+      DO: Check is user can favorite the property.
+  */
   try {
     //Check required information.
     if (!req.params.property_id) {
@@ -935,8 +956,11 @@ router.get("/favorite/:property_id", async (req, res) => {
     }
   }
 });
-// [GET] : Get owner's contact.
+// [GET] : /contact/:property_id
 router.get("/contact/:property_id", async (req, res) => {
+  /*
+      DO: Get owner's contact of the property.
+  */
   try {
     //Check required information
     if (!req.params.property_id) {
@@ -955,6 +979,7 @@ router.get("/contact/:property_id", async (req, res) => {
     const staff = await UserTools.checkIsStaff(user.username);
     if (staff) {
       //CASE: User is staff.
+      //Query owner's contact.
       const owner_result = await DB.query(
         "SELECT username, full_name, email, phone_number, avatar_id FROM users INNER JOIN customers USING(username) INNER JOIN properties ON customers.customer_id = properties.property_id WHERE property_id=$1;",
         [property_id]

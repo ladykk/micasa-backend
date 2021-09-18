@@ -14,6 +14,7 @@ const validateUser = async (username) => {
     //CASE: User not found.
     throw new CustomError.Unauthorized();
   } else {
+    //CASE: User found.
     return user_result.rows[0];
   }
 };
@@ -36,18 +37,6 @@ const validateToken = async (req) => {
       return null;
     }
   }
-};
-
-const isHasAgent = async (username) => {
-  //Check if added user already have an agent?
-  const is_have_agent_result = await DB.query(
-    "SELECT * FROM customers WHERE username=$1;",
-    [username]
-  ).catch((err) => {
-    throw new CustomError.DBError(err, "is_have_agent_result");
-  });
-  const agent = is_have_agent_result.rows[0].agent;
-  return agent ? true : false;
 };
 
 const checkIsCustomer = async (username) => {
@@ -97,7 +86,6 @@ const checkIsStaff = async (username) => {
 module.exports = {
   validateToken,
   validateUser,
-  isHasAgent,
   checkIsCustomer,
   checkIsAgent,
   checkIsWebmaster,

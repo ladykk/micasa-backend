@@ -5,8 +5,11 @@ const CustomError = require("../tools/CustomError");
 
 //Webmaster's Function
 
-// [GET] : Get pending approve properties.
+// [GET] : /approve
 router.get("/approve", async (req, res) => {
+  /*
+      DO: Get pending properties.
+  */
   try {
     //Check Authorization.
     const user = await UserTools.validateToken(req);
@@ -50,8 +53,11 @@ router.get("/approve", async (req, res) => {
     }
   }
 });
-// [POST] : Approve property.
+// [POST] : /approve
 router.patch("/approve", async (req, res) => {
+  /*
+      DO: Approve property
+  */
   try {
     //Check required information
     if (!req.body.status || !req.body.property_id) {
@@ -101,8 +107,11 @@ router.patch("/approve", async (req, res) => {
     }
   }
 });
-// [GET] : Get agents.
+// [GET] : /agents/
 router.get("/agents/", async (req, res) => {
+  /*
+      DO: Get agents' list.
+  */
   try {
     //Check Authorization.
     const user = await UserTools.validateToken(req);
@@ -144,8 +153,11 @@ router.get("/agents/", async (req, res) => {
     }
   }
 });
-// [POST] : Add agents.
+// [POST] : /agents/add
 router.post("/agents/add", async (req, res) => {
+  /*
+      DO: Add agent.
+  */
   try {
     //Check required information
     if (!req.body.username) {
@@ -198,8 +210,11 @@ router.post("/agents/add", async (req, res) => {
     }
   }
 });
-// [DELETE] : Remove agent.
+// [DELETE] : /agents/remove:username
 router.delete("/agents/remove/:username", async (req, res) => {
+  /*
+      DO: Remove agent.
+  */
   try {
     //Check required information.
     if (!req.params.username) {
@@ -249,8 +264,11 @@ router.delete("/agents/remove/:username", async (req, res) => {
     }
   }
 });
-// [GET] : Get customers of agent.
+// [GET] : /customers/:agent_id
 router.get("/customers/:agent_id", async (req, res) => {
+  /*
+      DO: Get customers's list of an agent.
+  */
   try {
     //Check required information.
     if (!req.params.agent_id) {
@@ -300,8 +318,11 @@ router.get("/customers/:agent_id", async (req, res) => {
     }
   }
 });
-// [POST] : Add Customer.
+// [POST] : /customers/add
 router.post("/customers/add", async (req, res) => {
+  /*
+      DO: Add customer to an agent.
+  */
   try {
     //Check required information.
     if (!req.body.username && !req.body.agent_username) {
@@ -367,8 +388,11 @@ router.post("/customers/add", async (req, res) => {
     }
   }
 });
-// [DELETE] : Remove Customer.
+// [DELETE] : /customers/remove/:username
 router.delete("/customers/remove/:username", async (req, res) => {
+  /*
+      DO: Remove agent from customer.
+  */
   try {
     //Check required information.
     if (!req.params.username) {

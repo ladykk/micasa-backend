@@ -4,9 +4,13 @@ const DB = require("../db");
 const UserTools = require("../tools/UserTools");
 const CustomError = require("../tools/CustomError");
 
-// [GET] : Get reviews
+// [GET] : /
 router.get("/", async (req, res) => {
+  /*
+      DO: Get latest 10 reviews.
+  */
   try {
+    //Query reviews.
     await DB.query(
       "SELECT full_name, avatar_id, rate, message FROM reviews NATURAL JOIN properties NATURAL JOIN customers NATURAL JOIN users WHERE message IS NOT NULL AND rate IS NOT NULL ORDER BY timestamp DESC LIMIT 10;"
     )
@@ -37,8 +41,11 @@ router.get("/", async (req, res) => {
     }
   }
 });
-// [GET] : Get user's pending reviews
+// [GET] : /pending
 router.get("/pending", async (req, res) => {
+  /*
+      DO: Get pending review of the user.
+  */
   try {
     //Check Authorization.
     const user = await UserTools.validateToken(req);
@@ -50,6 +57,7 @@ router.get("/pending", async (req, res) => {
     const customer = await UserTools.checkIsCustomer(user.username);
     if (customer) {
       //CASE: Found customer
+      //Query pending review of customer.
       await DB.query(
         "SELECT property_name, property_id, image_cover, role FROM reviews NATURAL JOIN properties WHERE message IS NULL AND rate IS NULL;"
       )
@@ -84,8 +92,11 @@ router.get("/pending", async (req, res) => {
     }
   }
 });
-// [POST] : Reviews
+// [POST] : /pending
 router.post("/pending", async (req, res) => {
+  /*
+      DO: Update pending review.
+  */
   try {
     //Check required information.
     if (!req.body.property_id || !req.body.rate || !req.body.message) {
@@ -147,8 +158,11 @@ router.post("/pending", async (req, res) => {
     }
   }
 });
-// [GET] : Get user's history reviews
+// [GET] : /history
 router.get("/history", async (req, res) => {
+  /*
+      DO: Get history reviews of the user.
+  */
   try {
     //Check Authorization.
     const user = await UserTools.validateToken(req);

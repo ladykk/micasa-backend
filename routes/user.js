@@ -10,8 +10,11 @@ const Nodemailer = require("../tools/Nodemailer");
 
 //User's Function
 
-// [POST] : Register
+// [POST] : /register
 router.post("/register", async (req, res) => {
+  /*
+      DO: Add new user.
+  */
   try {
     //Model user and generate password.
     const new_user = await User.new_user(
@@ -24,8 +27,6 @@ router.post("/register", async (req, res) => {
     ).catch((err) => {
       throw new CustomError.BadRequest();
     });
-    //Check is model error.
-    //CASE: Model is correct.
     //Insert user to database.
     let insert_user_result = await DB.query(
       "INSERT INTO users (username, password, full_name, email, phone_number) VALUES ($1, $2, $3, $4, $5) RETURNING username, full_name, email, phone_number;",
@@ -94,8 +95,11 @@ router.post("/register", async (req, res) => {
     });
   }
 });
-// [POST] : Login
+// [POST] : /login
 router.post("/login", async (req, res) => {
+  /*
+      DO: Validate user and generate token.
+  */
   try {
     //Check required information.
     if (!req.body.username || !req.body.password) {
@@ -147,8 +151,11 @@ router.post("/login", async (req, res) => {
     });
   }
 });
-// [GET] : Get user's detail
+// [GET] : /user
 router.get("/user", async (req, res) => {
+  /*
+      DO: Get user detail from token.
+  */
   try {
     //Check is has cookie
     if (!req.cookies["jwt"]) {
@@ -247,13 +254,19 @@ router.get("/user", async (req, res) => {
     }
   }
 });
-// [POST] : Logout.
+// [POST] : /logout
 router.post("/logout", async (req, res) => {
+  /*
+      DO: Remove user's token.
+  */
   res.cookie("jwt", "", { maxAge: 0, secure: false });
   res.status(200).send({ message: "success" });
 });
-// [PATCH] : Update.
+// [PATCH] : /update
 router.patch("/update", async (req, res) => {
+  /*
+      DO: Update user's detail.
+  */
   try {
     //Get inputs
     const inputs = {
@@ -352,8 +365,11 @@ router.patch("/update", async (req, res) => {
     }
   }
 });
-// [DELETE] : Remove avatar.
+// [DELETE] : /remove_avatar
 router.delete("/remove_avatar", async (req, res) => {
+  /*
+      DO: Remove avatar from user.
+  */
   try {
     //Check Authentication.
     const user = await UserTools.validateToken(req);
@@ -392,8 +408,11 @@ router.delete("/remove_avatar", async (req, res) => {
     }
   }
 });
-// [POST] : Get recovery email.
+// [POST] : /recover
 router.post("/recover", async (req, res) => {
+  /*
+      DO: Sent recover email.
+  */
   try {
     //Check required information
     if (!req.body.username || !req.body.email) {
@@ -436,8 +455,11 @@ router.post("/recover", async (req, res) => {
     }
   }
 });
-// [GET] : Check Recovery token.
+// [GET] : /recover/:token
 router.get("/recover/:token", async (req, res) => {
+  /*
+      DO: Validate recover token.
+  */
   try {
     //Check required information.
     if (!req.params.token) {
@@ -469,8 +491,11 @@ router.get("/recover/:token", async (req, res) => {
     }
   }
 });
-
+// [PATCH] : /recover
 router.patch("/recover/", async (req, res) => {
+  /*
+      DO: Update user password.
+  */
   try {
     //Check required information.
     if (!req.body.token || !req.body.password) {
